@@ -32,7 +32,6 @@
 #include "shared/ros/ros_helpers.h"
 #include "navigation.h"
 #include "visualization/visualization.h"
-#include "obstacle_avoidance.h"
 
 using Eigen::Vector2f;
 using amrl_msgs::AckermannCurvatureDriveMsg;
@@ -115,37 +114,14 @@ void Navigation::Run() {
   // If odometry has not been initialized, we can't do anything.
   if (!odom_initialized_) return;
 
-  /// Control Loop ///
+  // The control iteration goes here. 
+  // Feel free to make helper functions to structure the control appropriately.
+  
+  // The latest observed point cloud is accessible via "point_cloud_"
 
-  // 1) Forward predict state according to system latency (MELISSA)
-  // 2) Transform point cloud and goal point to predicted base_link frame at time=t+latency? (MELISSA)
-  // 3) Calculate curvature to goal point (For assignment 1, its always zero, but will need in future) (MAXX)
-  // 4) Generate range of possible paths centered on goal_curvature, using std::vector<struct PathOption>(MAXX)
-  // 5) Eliminate Obstacle Points - (MAXX)
-  // 6) For possible paths and point_cloud:
-  //    - Get Path Length (MAXX)
-  //    - Get Clearance (MELISSA)
-  //    - Get Distance to Goal (YUHONG, look at math functions)
-  // 7) Select best path from scoring function (Easy, YUHONG)
-  // 8) Publish commands with 1-D TOC (YUHONG)
-
-  /*
-  GetMinStoppingDistance();
-
-  if (dist to obstacle - next predicted position) < min stopping distance
-  then, deccelerate
-
-  else set max speed
-
-  drive_msg_.velocity = setVelocity1DTOC(path_length, current_velocity);
-
-  */
-
-  // Issue vehicle commands
-  drive_msg_.curvature = 0.0;
-  drive_msg_.velocity = 0.0;
-
-  visualization::DrawPathOption(1.0, 4.0, 0.0, local_viz_msg_);
+  // Eventually, you will have to set the control values to issue drive commands:
+  // drive_msg_.curvature = ...;
+  // drive_msg_.velocity = ...;
 
   // Add timestamps to all messages.
   local_viz_msg_.header.stamp = ros::Time::now();
