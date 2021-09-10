@@ -19,11 +19,11 @@
 */
 //========================================================================
 
-#include "obstacle_avoidance.h"
-#include "car_params.h"
+#include "obstacle_avoidance/obstacle_avoidance.h"
+#include "obstacle_avoidance/car_params.h"
 
 // Uses curvature and point cloud to calculate path option info
-struct navigation::PathOption CheckPathWithObstacles(float curvature){
+struct navigation::PathOption EvaluatePath(float curvature, std::vector<Eigen::Vector2f> point_cloud){
     struct navigation::PathOption path;
 
     // TODO: Needs to handle small/zero curvatures
@@ -60,4 +60,8 @@ struct navigation::PathOption CheckPathWithObstacles(float curvature){
     }
 
     return path;
+}
+
+float GetCurvatureFromGoalPoint(Eigen::Vector2f point){
+    return 0.0;
 }

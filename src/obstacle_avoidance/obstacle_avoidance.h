@@ -19,11 +19,18 @@
 */
 //========================================================================
 
+#include <vector>
+
+#include "eigen3/Eigen/Dense"
+
 #include "navigation/navigation.h"
 
 #ifndef OBSTACLE_AVOIDANCE_H
 #define OBSTACLE_AVOIDANCE_H
 
-struct navigation::PathOption PathOptionFromPointCloud(float curvature);
+void EvaluatePathLength(struct navigation::PathOption path, std::vector<Eigen::Vector2f> point_cloud);
+
+// Given a goal point in base_link frame, return a curvature path that intersects the point
+float GetCurvatureFromGoalPoint(Eigen::Vector2f point);
 
 #endif // OBSTACLE_AVOIDANCE_H
