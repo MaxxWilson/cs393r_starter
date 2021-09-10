@@ -32,7 +32,7 @@
 #include "shared/ros/ros_helpers.h"
 #include "navigation.h"
 #include "visualization/visualization.h"
-#include "obstacle_avoidance.h"
+#include "obstacle_avoidance/obstacle_avoidance.h"
 
 using Eigen::Vector2f;
 using amrl_msgs::AckermannCurvatureDriveMsg;
