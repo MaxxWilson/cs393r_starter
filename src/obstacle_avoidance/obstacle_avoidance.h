@@ -30,7 +30,7 @@
 
 namespace obstacle_avoidance{
 
-float GetPathLengthFromPointCloud(float curvature, std::vector<Eigen::Vector2f> point_cloud);
+float GetPathLengthToObstacle(float curvature, Eigen::Vector2f point_obstacle);
 
 // Given a goal point in base_link frame, return a curvature path that intersects the point
 float GetCurvatureFromGoalPoint(Eigen::Vector2f point);

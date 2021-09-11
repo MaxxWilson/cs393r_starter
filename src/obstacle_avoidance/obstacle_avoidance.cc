@@ -25,43 +25,54 @@
 namespace obstacle_avoidance{
 
 // Uses curvature and point cloud to calculate path option info
-float GetPathLengthFromPointCloud(float curvature, std::vector<Eigen::Vector2f> point_cloud){
-    // TODO: Needs to handle small/zero curvatures
+float GetPathLengthToObstacle(float curvature, Eigen::Vector2f point_obstacle){
+    
+    float dist_to_front_bumper = (car_params::length + car_params::wheel_base)/2 + car_params::safety_margin;
 
-    // Calculate radii that bound collision regions
+    // Straight Ahead / Zero Curvature
+    if(curvature < 1e-5){
+        if(abs(point_obstacle[1]) > (car_params::safety_margin + car_params::width / 2)){
+            // No Collision
+            return car_params::max_path_length;
+        }
+        else{
+            // Front Collision
+            return point_obstacle[0] - dist_to_front_bumper;
+        }
+    }
+
     float max_radius = hypot(
-        1/curvature + car_params::width/2 + car_params::safety_margin,
-        (car_params::length + car_params::wheel_base)/2 + car_params::safety_margin);
+        dist_to_front_bumper,
+        1/curvature + car_params::width/2 + car_params::safety_margin);
 
     float boundary_radius = hypot(
-        1/curvature - car_params::width/2 - car_params::safety_margin,
-        (car_params::length + car_params::wheel_base)/2 + car_params::safety_margin);
+        dist_to_front_bumper,
+        1/curvature - car_params::width/2 - car_params::safety_margin);
     
     float min_radius = 1/curvature - car_params::width/2 - car_params::safety_margin;
 
-    // FOR EACH POINT IN POINT CLOUD
-    Eigen::Vector2f point_obstacle;
-    Eigen::Vector2f arc_center(0, -1/curvature);
-
-    // Calculate radius to obstacle
-    float obstacle_radius = (point_obstacle - arc_center).norm();
-
-    float path_length = 0.0;
+    float obstacle_radius = (point_obstacle - Eigen::Vector2f(0, 1/curvature)).norm();
+    
+    float angle_to_obstacle = atan2(point_obstacle[0], 1/curvature - point_obstacle[1]);
 
     if(obstacle_radius < min_radius){
         // No Collision, Inner Miss
+        return car_params::max_path_length;
     }
     else if(min_radius <= obstacle_radius && obstacle_radius <= boundary_radius){
         // Side Collision
+        float angle_to_collision = atan2(sqrt(obstacle_radius*obstacle_radius - min_radius*min_radius), min_radius);
+        return obstacle_radius * (angle_to_obstacle - angle_to_collision);
     }
     else if(boundary_radius <= obstacle_radius && obstacle_radius <= max_radius){
         // Front Collision
+        float angle_to_collision = atan2(dist_to_front_bumper, sqrt(obstacle_radius*obstacle_radius - dist_to_front_bumper*dist_to_front_bumper));
+        return obstacle_radius * (angle_to_obstacle - angle_to_collision);
     }
     else{
         // No Collision, Outer Miss
+        return car_params::max_path_length;
     }
-
-    return path_length;
 }
 
 float GetCurvatureFromGoalPoint(Eigen::Vector2f point){
