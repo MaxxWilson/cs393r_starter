@@ -39,6 +39,9 @@ const float min_curvature = -2.0;
 const float max_acceleration = 5.0;
 const float min_acceleration = -5.0;
 const float max_velocity = 1.0;
+
+// Algorithmic Parameters
+const float max_path_length = 5;
 }
 
 #endif // CAR_PARAMS_H
