@@ -28,9 +28,13 @@
 #ifndef OBSTACLE_AVOIDANCE_H
 #define OBSTACLE_AVOIDANCE_H
 
-void EvaluatePathLength(struct navigation::PathOption path, std::vector<Eigen::Vector2f> point_cloud);
+namespace obstacle_avoidance{
+
+float GetPathLengthFromPointCloud(float curvature, std::vector<Eigen::Vector2f> point_cloud);
 
 // Given a goal point in base_link frame, return a curvature path that intersects the point
 float GetCurvatureFromGoalPoint(Eigen::Vector2f point);
+
+} // namespace obstacle_avoidance
 
 #endif // OBSTACLE_AVOIDANCE_H

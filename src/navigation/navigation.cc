@@ -120,6 +120,14 @@ void Navigation::Run() {
   // 1) Forward predict state according to system latency (MELISSA)
   // 2) Transform point cloud and goal point to predicted base_link frame at time=t+latency? (MELISSA)
   // 3) Calculate curvature to goal point (For assignment 1, its always zero, but will need in future) (MAXX)
+
+  Eigen::Vector2f goal_point(-0.5, 0.5);
+
+  float curvature = obstacle_avoidance::GetCurvatureFromGoalPoint(goal_point);
+
+  visualization::DrawPathOption(curvature, 2.4, 0.0, local_viz_msg_);
+  visualization::DrawCross(goal_point, 0.1,  0x0046FF, local_viz_msg_);
+
   // 4) Generate range of possible paths centered on goal_curvature, using std::vector<struct PathOption>(MAXX)
   // 5) Eliminate Obstacle Points - (MAXX)
   // 6) For possible paths and point_cloud:
@@ -138,14 +146,11 @@ void Navigation::Run() {
   else set max speed
 
   drive_msg_.velocity = setVelocity1DTOC(path_length, current_velocity);
-
   */
 
   // Issue vehicle commands
   drive_msg_.curvature = 0.0;
   drive_msg_.velocity = 0.0;
-
-  visualization::DrawPathOption(1.0, 4.0, 0.0, local_viz_msg_);
 
   // Add timestamps to all messages.
   local_viz_msg_.header.stamp = ros::Time::now();

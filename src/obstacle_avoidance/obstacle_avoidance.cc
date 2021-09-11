@@ -22,10 +22,10 @@
 #include "obstacle_avoidance/obstacle_avoidance.h"
 #include "obstacle_avoidance/car_params.h"
 
-// Uses curvature and point cloud to calculate path option info
-struct navigation::PathOption EvaluatePath(float curvature, std::vector<Eigen::Vector2f> point_cloud){
-    struct navigation::PathOption path;
+namespace obstacle_avoidance{
 
+// Uses curvature and point cloud to calculate path option info
+float GetPathLengthFromPointCloud(float curvature, std::vector<Eigen::Vector2f> point_cloud){
     // TODO: Needs to handle small/zero curvatures
 
     // Calculate radii that bound collision regions
@@ -46,6 +46,8 @@ struct navigation::PathOption EvaluatePath(float curvature, std::vector<Eigen::V
     // Calculate radius to obstacle
     float obstacle_radius = (point_obstacle - arc_center).norm();
 
+    float path_length = 0.0;
+
     if(obstacle_radius < min_radius){
         // No Collision, Inner Miss
     }
@@ -59,9 +61,19 @@ struct navigation::PathOption EvaluatePath(float curvature, std::vector<Eigen::V
         // No Collision, Outer Miss
     }
 
-    return path;
+    return path_length;
 }
 
 float GetCurvatureFromGoalPoint(Eigen::Vector2f point){
-    return 0.0;
+    float x = point[0];
+    float y = point[1];
+
+    if(abs(y)>1e-5){ // Non-Zero Curvature
+        return 2/(y + pow(x, 2)/y);
+    }
+    else{
+        return 0.0;
+    }
 }
+
+} // namespace obstacle_avoidance
