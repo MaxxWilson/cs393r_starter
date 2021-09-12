@@ -26,6 +26,8 @@
 #include "shared/math/line2d.h"
 
 #include "gflags/gflags.h"
+
+#include "visualization/visualization.h"
 // line arguments used in obstacle avoidance function
 DEFINE_double(clearance_param,0.1,"clearance parameter used in scoring function");
 DEFINE_double(distance_goal_param,-0.1,"distance to goal parameter used in scoring function");
@@ -109,7 +111,7 @@ double GetDistanceToGoal(const navigation::PathOption& path,const Eigen::Vector2
 struct navigation::PathOption ChooseBestPath(std::vector<navigation::PathOption>& paths, const Eigen::Vector2f& goal){
     navigation::PathOption* bestPath = NULL;
     double best_score = -DBL_MAX;
-    for(auto path:paths){
+    for(auto& path:paths){
         double distance_to_goal = GetDistanceToGoal(path,goal);
         double score = path.free_path_length + FLAGS_clearance_param * path.clearance + FLAGS_distance_goal_param * distance_to_goal;
         if(score>best_score){
@@ -119,4 +121,49 @@ struct navigation::PathOption ChooseBestPath(std::vector<navigation::PathOption>
     }
     return *bestPath;
 }
+
+// Visualization for needed for obstacle avoidance
+void VisualizeObstacleAvoidanceInfo(Eigen::Vector2f& goal,
+                           std::vector<navigation::PathOption>& paths,
+                           const navigation::PathOption& selected_path,
+                           amrl_msgs::VisualizationMsg &msg){
+    CarOutliner(msg);
+    PossiblePathsOutliner(paths,msg);
+    SelectedPathOutliner(selected_path,msg);
+    GoalOutliner(goal,msg);
+}
+
+// Outline the car[Yellow Line] and safety margin
+void CarOutliner(amrl_msgs::VisualizationMsg &msg){
+    Eigen::Vector2f front_left((car_params::wheel_base+car_params::length)/2,car_params::width/2);
+    Eigen::Vector2f front_right((car_params::wheel_base+car_params::length)/2,-car_params::width/2);
+    Eigen::Vector2f back_left(-(car_params::length-car_params::wheel_base)/2,car_params::width/2);
+    Eigen::Vector2f back_right(-(car_params::length-car_params::wheel_base)/2,-car_params::width/2);
+    //car front
+    visualization::DrawLine(front_left,front_right,0xfcd703,msg);
+    //car back
+    visualization::DrawLine(back_left,back_right,0xfcd703,msg);
+    //car left
+    visualization::DrawLine(front_left,back_left,0xfcd703,msg);
+    //car right
+    visualization::DrawLine(front_right,back_right,0xfcd703,msg);
+    //TODO: safety margin
+}
+// Draw all the possible path options
+void PossiblePathsOutliner(const std::vector<navigation::PathOption>& paths,amrl_msgs::VisualizationMsg& msg){
+    for(auto& path:paths){
+        visualization::DrawPathOption(path.curvature,path.free_path_length,0.0,msg);
+    }
+}
+// Draw the selected path
+void SelectedPathOutliner(const navigation::PathOption& selected_path,amrl_msgs::VisualizationMsg& msg){
+    visualization::DrawPathOption(selected_path.curvature,selected_path.free_path_length,selected_path.clearance,msg);
+    //draw the closest point [Blue Cross]
+    visualization::DrawCross(selected_path.closest_point,0.25,0x1e9aa8,msg);
+}
+// Draw goal [Green Cross]
+void GoalOutliner(Eigen::Vector2f& goal, amrl_msgs::VisualizationMsg& msg){
+    visualization::DrawCross(goal,0.5,0x1ea845,msg);
+}
+
 

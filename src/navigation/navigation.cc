@@ -106,7 +106,7 @@ void Navigation::ObservePointCloud(const vector<Vector2f>& cloud,
   point_cloud_ = cloud;                                     
 }
 
-//Solve the 1D-TOC Problem
+//Solve the TOC Problem
 void Navigation::timeOptimalControl(const PathOption& path) {
     double current_speed = robot_vel_.norm();
     double min_stop_distance = car_params::safe_distance-0.5*current_speed*current_speed/car_params::min_acceleration; //calculate the minimum stopping distance at current velocity
@@ -118,8 +118,8 @@ void Navigation::timeOptimalControl(const PathOption& path) {
     drive_msg_.velocity = set_speed;
     drive_pub_.publish(drive_msg_);
     //TODO: record the commands used for latency compensation
-
 }
+//Show all the obstacles
 
 void Navigation::Run() {
   // This function gets called 20 times a second to form the control loop.
