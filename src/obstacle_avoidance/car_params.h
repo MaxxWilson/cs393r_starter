@@ -39,6 +39,9 @@ const float min_curvature = -2.0;
 const float max_acceleration = 5.0;
 const float min_acceleration = -5.0;
 const float max_velocity = 1.0;
+
+// Safety Consideration
+const float safe_distance = 0.2; // safe distance used in TOC control
 }
 
 #endif // CAR_PARAMS_H

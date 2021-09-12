@@ -33,6 +33,7 @@
 #include "navigation.h"
 #include "visualization/visualization.h"
 #include "obstacle_avoidance/obstacle_avoidance.h"
+#include "obstacle_avoidance/car_params.h"
 
 using Eigen::Vector2f;
 using amrl_msgs::AckermannCurvatureDriveMsg;
@@ -103,6 +104,21 @@ void Navigation::UpdateOdometry(const Vector2f& loc,
 void Navigation::ObservePointCloud(const vector<Vector2f>& cloud,
                                    double time) {
   point_cloud_ = cloud;                                     
+}
+
+//Solve the 1D-TOC Problem
+void Navigation::timeOptimalControl(const PathOption& path) {
+    double current_speed = robot_vel_.norm();
+    double min_stop_distance = car_params::safe_distance-0.5*current_speed*current_speed/car_params::min_acceleration; //calculate the minimum stopping distance at current velocity
+    double set_speed = (path.free_path_length>min_stop_distance)?car_params::max_velocity:0; //decelerate if free path is is smaller than minimum stopping distance otherwise accelerate
+    //publish command to topic 
+    drive_msg_.header.seq++;
+    drive_msg_.header.stamp = ros::Time::now();
+    drive_msg_.curvature = path.curvature;
+    drive_msg_.velocity = set_speed;
+    drive_pub_.publish(drive_msg_);
+    //TODO: record the commands used for latency compensation
+
 }
 
 void Navigation::Run() {
