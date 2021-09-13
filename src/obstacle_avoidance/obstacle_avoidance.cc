@@ -59,7 +59,7 @@ bool IsPointCollisionPossible(float curvature, const Eigen::Vector2f &point){
     }
 }
    
-void EvaluatePathWithPointCloud(navigation::PathOption &path_option, const PathBoundaries &collision_bounds, const std::vector<Eigen::Vector2f> &point_cloud_){
+void EvaluatePathWithPointCloud(navigation::PathOption &path_option, const PathBoundaries &collision_bounds, std::vector<Eigen::Vector2f> &point_cloud_){
     for(std::size_t point_index = 0; point_index < point_cloud_.size(); point_index++){
         Eigen::Vector2f point = point_cloud_[point_index];
 
@@ -145,10 +145,6 @@ float GetCurvatureFromGoalPoint(Eigen::Vector2f point){
 float GetCurvatureOptionFromRange(float desired_val_index, float req_val, float min_val, float increment){
     float offset = - floor((req_val - min_val)/increment) * increment;
     return req_val + offset + desired_val_index*increment;
-}
-
-float GetCurvatureFromGoalPoint(Eigen::Vector2f point){
-    return 0.0;
 }
 
 //helper function: get the angle between vector[p_middle,p_left] and vector[p_middle,p_right]
