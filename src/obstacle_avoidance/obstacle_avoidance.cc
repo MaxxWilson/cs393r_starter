@@ -27,7 +27,7 @@
 
 #include "gflags/gflags.h"
 
-#include "visualization/visualization.h"
+
 // line arguments used in obstacle avoidance function
 DEFINE_double(clearance_param,0.1,"clearance parameter used in scoring function");
 DEFINE_double(distance_goal_param,-0.1,"distance to goal parameter used in scoring function");
@@ -87,9 +87,10 @@ double getAngle(const Eigen::Vector2f& p_middle, const Eigen::Vector2f& p_left, 
 
 // limit free path length and calculate closest point to goal 
 void LimitFreePath(navigation::PathOption& path,const Eigen::Vector2f& goal){
-    Eigen::Vector2f rotate_center(0, -1/path.curvature);
+    Eigen::Vector2f rotate_center(0, 1/path.curvature);
     Eigen::Vector2f car_odem(0,0);
     double angle = getAngle(rotate_center,goal,car_odem);
+    if (goal[0] < 0) angle = 2*M_PI - angle; // if goal is at the back of the car
     // check whether the free path need to be trimmed
     if(abs(angle/path.curvature)<path.free_path_length){
         // trim free path and change obstruction point to the closest point

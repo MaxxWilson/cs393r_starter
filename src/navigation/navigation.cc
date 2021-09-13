@@ -156,12 +156,19 @@ void Navigation::Run() {
   drive_msg_.velocity = setVelocity1DTOC(path_length, current_velocity);
 
   */
-
+  // CarOutliner(local_viz_msg_);
   // Issue vehicle commands
   drive_msg_.curvature = 0.0;
   drive_msg_.velocity = 0.0;
 
-  visualization::DrawPathOption(1.0, 4.0, 0.0, local_viz_msg_);
+  //debug LimitFreePath function
+  // navigation::PathOption path{0.5,0,4*M_PI,{0,0},{0,0}};
+  // Eigen::Vector2f goal(1,3);
+  // SelectedPathOutliner(path,local_viz_msg_);
+  // LimitFreePath(path,goal);
+  // SelectedPathOutliner(path,local_viz_msg_);
+  // GoalOutliner(goal,local_viz_msg_);
+  // visualization::DrawPathOption(1.0, 4.0, 0.0, local_viz_msg_);
 
   // Add timestamps to all messages.
   local_viz_msg_.header.stamp = ros::Time::now();

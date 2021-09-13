@@ -30,6 +30,8 @@
 #define OBSTACLE_AVOIDANCE_H
 
 void EvaluatePathLength(struct navigation::PathOption path, std::vector<Eigen::Vector2f> point_cloud);
+// limit free path length and calculate closest point to goal 
+void LimitFreePath(navigation::PathOption& path,const Eigen::Vector2f& goal);
 
 // Given a goal point in base_link frame, return a curvature path that intersects the point
 float GetCurvatureFromGoalPoint(Eigen::Vector2f point);
