@@ -24,6 +24,7 @@
 #include "eigen3/Eigen/Dense"
 
 #include "navigation/navigation.h"
+#include "visualization/visualization.h"
 #include "obstacle_avoidance/car_params.h"
 
 #ifndef OBSTACLE_AVOIDANCE_H
@@ -91,6 +92,17 @@ navigation::PathOption EvaluatePathWithPoint(const PathBoundaries &collision_bou
  */
 float GetCurvatureFromGoalPoint(Eigen::Vector2f point);
 
+// visualization functions
+// call the other visualization functions to visualize all the information needed for obstacle avoidance
+void VisualizeObstacleAvoidanceInfo(Eigen::Vector2f& goal,
+                           std::vector<navigation::PathOption>& paths,
+                           const navigation::PathOption& selected_path,
+                           amrl_msgs::VisualizationMsg &msg);
+void CarOutliner(amrl_msgs::VisualizationMsg& msg);
+void PossiblePathsOutliner(const std::vector<navigation::PathOption>& paths,amrl_msgs::VisualizationMsg& msg);
+void SelectedPathOutliner(const navigation::PathOption& selected_path,amrl_msgs::VisualizationMsg& msg);
+void GoalOutliner(Eigen::Vector2f& goal, amrl_msgs::VisualizationMsg& msg);
+
 /**
  * For Side Collision, calculate Free Path Length to obstacle.
  * 
@@ -136,5 +148,4 @@ float GetPathLengthToFrontCollision(float radius_to_collision, float angle_to_ob
 float GetCurvatureOptionFromRange(float desired_val_index, float req_val, float min_val, float increment);
 
 } // namespace obstacle_avoidance
-
 #endif // OBSTACLE_AVOIDANCE_H

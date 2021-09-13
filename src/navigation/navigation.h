@@ -64,7 +64,8 @@ class Navigation {
   void Run();
   // Used to set the next target pose.
   void SetNavGoal(const Eigen::Vector2f& loc, float angle);
-
+  // Use time optimal strategy to control the car
+  void timeOptimalControl(const PathOption& path);
  private:
 
   // Whether odometry has been initialized.

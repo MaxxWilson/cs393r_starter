@@ -25,6 +25,16 @@
 
 #include "obstacle_avoidance/obstacle_avoidance.h"
 
+#include <float.h>
+#include "shared/math/line2d.h"
+
+#include "gflags/gflags.h"
+
+#include "visualization/visualization.h"
+// line arguments used in obstacle avoidance function
+DEFINE_double(clearance_param,0.1,"clearance parameter used in scoring function");
+DEFINE_double(distance_goal_param,-0.1,"distance to goal parameter used in scoring function");
+
 using namespace math_util;
 namespace obstacle_avoidance{
 
@@ -49,7 +59,7 @@ bool IsPointCollisionPossible(float curvature, const Eigen::Vector2f &point){
     }
 }
    
-void EvaluatePathWithPointCloud(navigation::PathOption &path_option, const PathBoundaries &collision_bounds, std::vector<Eigen::Vector2f> &point_cloud_){
+void EvaluatePathWithPointCloud(navigation::PathOption &path_option, const PathBoundaries &collision_bounds, const std::vector<Eigen::Vector2f> &point_cloud_){
     for(std::size_t point_index = 0; point_index < point_cloud_.size(); point_index++){
         Eigen::Vector2f point = point_cloud_[point_index];
 
@@ -137,4 +147,96 @@ float GetCurvatureOptionFromRange(float desired_val_index, float req_val, float 
     return req_val + offset + desired_val_index*increment;
 }
 
+float GetCurvatureFromGoalPoint(Eigen::Vector2f point){
+    return 0.0;
+}
+
+//helper function: get the angle between vector[p_middle,p_left] and vector[p_middle,p_right]
+double getAngle(const Eigen::Vector2f& p_middle, const Eigen::Vector2f& p_left, const Eigen::Vector2f& p_right){
+    Eigen::Vector2f v1 = p_middle - p_left;
+    Eigen::Vector2f v2 = p_middle - p_right;
+    double angle = acos((v1/v1.norm()).dot(v2/v2.norm()));
+    return angle;
+}
+
+// limit free path length and calculate closest point to goal 
+void LimitFreePath(navigation::PathOption& path,const Eigen::Vector2f& goal){
+    Eigen::Vector2f rotate_center(0, -1/path.curvature);
+    Eigen::Vector2f car_odem(0,0);
+    double angle = getAngle(rotate_center,goal,car_odem);
+    // check whether the free path need to be trimmed
+    if(abs(angle/path.curvature)<path.free_path_length){
+        // trim free path and change obstruction point to the closest point
+        path.free_path_length = abs(angle/path.curvature);
+        // set the obstruction to the closet point
+        path.obstruction = rotate_center + 1/path.curvature*((goal-rotate_center)/(goal-rotate_center).norm());
+    }
+    double theta = path.free_path_length * path.curvature;
+    path.closest_point.x() = 1/path.curvature*sin(theta);
+    path.closest_point.y() = 1/path.curvature*(1-cos(theta));
+}
+
+//calculate distance to goal of the specific path
+double GetDistanceToGoal(const navigation::PathOption& path,const Eigen::Vector2f& goal){
+    return (path.closest_point-goal).norm();
+}
+
+//Scoring function
+struct navigation::PathOption ChooseBestPath(std::vector<navigation::PathOption>& paths, const Eigen::Vector2f& goal){
+    navigation::PathOption* bestPath = NULL;
+    double best_score = -DBL_MAX;
+    for(auto& path:paths){
+        double distance_to_goal = GetDistanceToGoal(path,goal);
+        double score = path.free_path_length + FLAGS_clearance_param * path.clearance + FLAGS_distance_goal_param * distance_to_goal;
+        if(score>best_score){
+            best_score = score;
+            bestPath = &path;
+        }
+    }
+    return *bestPath;
+}
+
+// Visualization for needed for obstacle avoidance
+void VisualizeObstacleAvoidanceInfo(Eigen::Vector2f& goal,
+                           std::vector<navigation::PathOption>& paths,
+                           const navigation::PathOption& selected_path,
+                           amrl_msgs::VisualizationMsg &msg){
+    CarOutliner(msg);
+    PossiblePathsOutliner(paths,msg);
+    SelectedPathOutliner(selected_path,msg);
+    GoalOutliner(goal,msg);
+}
+
+// Outline the car[Yellow Line] and safety margin
+void CarOutliner(amrl_msgs::VisualizationMsg &msg){
+    Eigen::Vector2f front_left((car_params::wheel_base+car_params::length)/2,car_params::width/2);
+    Eigen::Vector2f front_right((car_params::wheel_base+car_params::length)/2,-car_params::width/2);
+    Eigen::Vector2f back_left(-(car_params::length-car_params::wheel_base)/2,car_params::width/2);
+    Eigen::Vector2f back_right(-(car_params::length-car_params::wheel_base)/2,-car_params::width/2);
+    //car front
+    visualization::DrawLine(front_left,front_right,0xfcd703,msg);
+    //car back
+    visualization::DrawLine(back_left,back_right,0xfcd703,msg);
+    //car left
+    visualization::DrawLine(front_left,back_left,0xfcd703,msg);
+    //car right
+    visualization::DrawLine(front_right,back_right,0xfcd703,msg);
+    //TODO: safety margin
+}
+// Draw all the possible path options
+void PossiblePathsOutliner(const std::vector<navigation::PathOption>& paths,amrl_msgs::VisualizationMsg& msg){
+    for(auto& path:paths){
+        visualization::DrawPathOption(path.curvature,path.free_path_length,0.0,msg);
+    }
+}
+// Draw the selected path
+void SelectedPathOutliner(const navigation::PathOption& selected_path,amrl_msgs::VisualizationMsg& msg){
+    visualization::DrawPathOption(selected_path.curvature,selected_path.free_path_length,selected_path.clearance,msg);
+    //draw the closest point [Blue Cross]
+    visualization::DrawCross(selected_path.closest_point,0.25,0x1e9aa8,msg);
+}
+// Draw goal [Green Cross]
+void GoalOutliner(Eigen::Vector2f& goal, amrl_msgs::VisualizationMsg& msg){
+    visualization::DrawCross(goal,0.5,0x1ea845,msg);
+}
 } // namespace obstacle_avoidance
