@@ -32,6 +32,7 @@
 #include "shared/ros/ros_helpers.h"
 #include "navigation.h"
 #include "visualization/visualization.h"
+
 #include "obstacle_avoidance/obstacle_avoidance.h"
 #include "obstacle_avoidance/car_params.h"
 
@@ -136,27 +137,40 @@ void Navigation::Run() {
   // 1) Forward predict state according to system latency (MELISSA)
   // 2) Transform point cloud and goal point to predicted base_link frame at time=t+latency? (MELISSA)
   // 3) Calculate curvature to goal point (For assignment 1, its always zero, but will need in future) (MAXX)
+
+    Eigen::Vector2f goal_point(4, 0.0);
+
+    float goal_curvature = obstacle_avoidance::GetCurvatureFromGoalPoint(goal_point);
+    goal_curvature = Clamp(goal_curvature, car_params::min_curvature, car_params::max_curvature);
+
   // 4) Generate range of possible paths centered on goal_curvature, using std::vector<struct PathOption>(MAXX)
-  // 5) Eliminate Obstacle Points - (MAXX)
+
+    static std::vector<struct PathOption> path_options(car_params::num_curves);
+
   // 6) For possible paths and point_cloud:
-  //    - Get Path Length (MAXX)
-  //    - Get Clearance (MELISSA)
+    for(std::size_t curve_index = 0; curve_index < path_options.size(); curve_index++){
+      float curvature = obstacle_avoidance::GetCurvatureOptionFromRange(curve_index, goal_curvature, car_params::min_curvature, car_params::curvature_increment);
+      
+      // Initialize path_option and collision bounds for curvature
+      obstacle_avoidance::PathBoundaries collision_bounds(abs(curvature));
+      path_options[curve_index] = navigation::PathOption{
+        curvature,                    // curvature
+        10,                           // default clearance
+        car_params::max_path_length,  // free Path Length
+        Eigen::Vector2f(0, 0),        // obstacle point
+        Eigen::Vector2f(0, 0)};       // closest point
+
+      EvaluatePathWithPointCloud(path_options[curve_index], collision_bounds, point_cloud_);
+      
+      // Visualization test code
+      visualization::DrawPathOption(path_options[curve_index].curvature, path_options[curve_index].free_path_length, path_options[curve_index].clearance, local_viz_msg_);
+      visualization::DrawCross(path_options[curve_index].obstruction, 0.1,  0x0046FF, local_viz_msg_);
+    }
+
   //    - Get Distance to Goal (YUHONG, look at math functions)
   // 7) Select best path from scoring function (Easy, YUHONG)
-  // 8) Publish commands with 1-D TOC (YUHONG)
+  // 8) Publish commands with 1-D TOC (YUHONG)s
 
-  /*
-  GetMinStoppingDistance();
-
-  if (dist to obstacle - next predicted position) < min stopping distance
-  then, deccelerate
-
-  else set max speed
-
-  drive_msg_.velocity = setVelocity1DTOC(path_length, current_velocity);
-
-  */
-  // CarOutliner(local_viz_msg_);
   // Issue vehicle commands
   drive_msg_.curvature = 0.0;
   drive_msg_.velocity = 0.0;
