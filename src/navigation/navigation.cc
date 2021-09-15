@@ -120,17 +120,26 @@ void Navigation::timeOptimalControl(const PathOption& path) {
     drive_pub_.publish(drive_msg_);
     //TODO: record the commands used for latency compensation
 }
+
+double Navigation::sineVel(double index){
+
+  return 0.25 * sin(index) + 0.75;
+}
 //Show all the obstacles
 
 void Navigation::Run() {
   // This function gets called 20 times a second to form the control loop.
   
+  static float index = 0; 
+  index += 3.14/48;
   // Clear previous visualizations.
   visualization::ClearVisualizationMsg(local_viz_msg_);
   visualization::ClearVisualizationMsg(global_viz_msg_);
 
   // If odometry has not been initialized, we can't do anything.
   if (!odom_initialized_) return;
+
+  //std::cout << ros::Time::now().toNSec() << ", " << robot_vel_[0] << ", " << robot_vel_[1] << std::endl;
 
   /// Control Loop ///
 
@@ -148,6 +157,7 @@ void Navigation::Run() {
     static std::vector<struct PathOption> path_options(car_params::num_curves);
 
   // 6) For possible paths and point_cloud:
+  //auto start_time = ros::Time::now().toSec();
     for(std::size_t curve_index = 0; curve_index < path_options.size(); curve_index++){
       float curvature = obstacle_avoidance::GetCurvatureOptionFromRange(curve_index, goal_curvature, car_params::min_curvature, car_params::curvature_increment);
       
@@ -160,29 +170,32 @@ void Navigation::Run() {
         Eigen::Vector2f(0, 0),        // obstacle point
         Eigen::Vector2f(0, 0)};       // closest point
 
-      EvaluatePathWithPointCloud(path_options[curve_index], collision_bounds, point_cloud_);
-      
+      obstacle_avoidance::EvaluatePathWithPointCloud(path_options[curve_index], collision_bounds, point_cloud_);
+      obstacle_avoidance::EvaluateClearanceWithPointCloud(path_options[curve_index], collision_bounds, point_cloud_);
       // Visualization test code
+      
       visualization::DrawPathOption(path_options[curve_index].curvature, path_options[curve_index].free_path_length, path_options[curve_index].clearance, local_viz_msg_);
       visualization::DrawCross(path_options[curve_index].obstruction, 0.1,  0x0046FF, local_viz_msg_);
     }
-
+    //auto end_time = ros::Time::now().toSec();
+    //std::cout << end_time - start_time << std::endl;
+    // visualization::DrawPathOption(0, 10, 1, local_viz_msg_);
   //    - Get Distance to Goal (YUHONG, look at math functions)
   // 7) Select best path from scoring function (Easy, YUHONG)
   // 8) Publish commands with 1-D TOC (YUHONG)s
 
   // Issue vehicle commands
-  // drive_msg_.curvature = 0.0;
-  // drive_msg_.velocity = 0.0;
-
+  drive_msg_.curvature = 0.0;
+  drive_msg_.velocity = sineVel(index);
+  std::cout << "Velocity: " << drive_msg_.velocity << "  Reported Velocity: " << robot_vel_[0] << "  Index: " << index << "\n" ;
   // Add timestamps to all messages.
   local_viz_msg_.header.stamp = ros::Time::now();
   global_viz_msg_.header.stamp = ros::Time::now();
-  // drive_msg_.header.stamp = ros::Time::now();
+  drive_msg_.header.stamp = ros::Time::now();
   // Publish messages.
   viz_pub_.publish(local_viz_msg_);
   viz_pub_.publish(global_viz_msg_);
-  // drive_pub_.publish(drive_msg_);
+  drive_pub_.publish(drive_msg_);
 }
 
 }  // namespace navigation

@@ -39,11 +39,13 @@ using namespace math_util;
 namespace obstacle_avoidance{
 
 bool IsPointCollisionPossible(float curvature, const Eigen::Vector2f &point){
+    return true;
+    /*
     if(point[0] < 0){
         // Ignore points behind car
         return false;
     }
-    else if(Sign(curvature)*point[1] < -(car_params::width + car_params::safety_margin)){
+    else if(Sign(curvature)*point[1] < -(car_params::width + car_params::safety_margin + car_params::clearance_factor)){
         // Ignore points in the direction opposite of curvature
         // (Can't hit any point to the left when turning right)
         return false;
@@ -56,7 +58,7 @@ bool IsPointCollisionPossible(float curvature, const Eigen::Vector2f &point){
     }
     else{
         return true;
-    }
+    }*/
 }
    
 void EvaluatePathWithPointCloud(navigation::PathOption &path_option, const PathBoundaries &collision_bounds, std::vector<Eigen::Vector2f> &point_cloud_){
@@ -79,12 +81,54 @@ void EvaluatePathWithPointCloud(navigation::PathOption &path_option, const PathB
           path_option.free_path_length = path_result.free_path_length;
           path_option.obstruction = point_cloud_[point_index];
         }
-        if(abs(path_result.clearance) < abs(path_option.clearance)){
-          path_option.clearance = path_result.clearance;
-        }
-      }
+        // if(abs(path_result.clearance) < abs(path_option.clearance)){
+        //   path_option.clearance = path_result.clearance;
+        // }
+    }
 }
 
+void EvaluateClearanceWithPointCloud(navigation::PathOption &path_option, const PathBoundaries &collision_bounds, std::vector<Eigen::Vector2f> &point_cloud_){
+    path_option.clearance = car_params::clearance_factor;
+    Eigen::Vector2f obstacle = path_option.obstruction;
+    if(path_option.curvature < 0) obstacle[1] *= -1;
+    float angle_to_obstacle = atan2(obstacle[0], 1/collision_bounds.curvature - obstacle[1]);
+    if(angle_to_obstacle<0) angle_to_obstacle = -angle_to_obstacle + M_PI;
+    for(std::size_t point_index = 0; point_index < point_cloud_.size(); point_index++){
+        Eigen::Vector2f point = point_cloud_[point_index];
+        // if(!obstacle_avoidance::IsPointCollisionPossible(path_option.curvature, point)){
+        //   continue;
+        // }
+        // Easier to mirror a point for negative curvature than to make everything conditional on sign
+        if(path_option.curvature < 0){
+          point[1] *= -1;
+        }
+        float clearance = EvaluateClearanceWithPoint(collision_bounds, path_option, angle_to_obstacle, point);
+        if(clearance<path_option.clearance){
+            path_option.clearance = clearance;
+        }
+    }
+}
+float EvaluateClearanceWithPoint(const PathBoundaries &collision_bounds, const navigation::PathOption &path_option, float angle_to_obstacle, Eigen::Vector2f point){
+    float radius_to_point = (point - Eigen::Vector2f(0, 1/collision_bounds.curvature)).norm();
+    float angle_to_point = atan2(point[0], 1/collision_bounds.curvature - point[1]);
+    if(angle_to_point<0) angle_to_point = -angle_to_point + M_PI;
+    if(angle_to_obstacle<angle_to_point) return path_option.clearance;
+    // Evaluate Collision Region
+    if(radius_to_point < collision_bounds.min_radius){
+        // No Collision, Inner Miss
+        return collision_bounds.min_radius - radius_to_point;
+    }
+    else if(collision_bounds.min_radius <= radius_to_point && radius_to_point <= collision_bounds.boundary_radius){
+        return path_option.clearance;
+    }
+    else if(collision_bounds.boundary_radius <= radius_to_point && radius_to_point <= collision_bounds.max_radius){
+        return path_option.clearance;
+    }
+    else{
+        // No Collision, Outer Miss
+        return radius_to_point - collision_bounds.max_radius;
+    }
+}
 navigation::PathOption EvaluatePathWithPoint(const PathBoundaries &collision_bounds, Eigen::Vector2f point){
         navigation::PathOption path_result{0, 1000, car_params::max_path_length};
 
@@ -96,10 +140,12 @@ navigation::PathOption EvaluatePathWithPoint(const PathBoundaries &collision_bou
         float radius_to_obstacle = (point - Eigen::Vector2f(0, 1/collision_bounds.curvature)).norm();
         float angle_to_obstacle = atan2(point[0], 1/collision_bounds.curvature - point[1]);
 
+        // Dont check points larger than current collision angle TODO
+
         // Evaluate Collision Region
         if(radius_to_obstacle < collision_bounds.min_radius){
             // No Collision, Inner Miss
-            path_result.clearance = collision_bounds.min_radius - radius_to_obstacle;
+            // path_result.clearance = collision_bounds.min_radius - radius_to_obstacle;
         }
         else if(collision_bounds.min_radius <= radius_to_obstacle && radius_to_obstacle <= collision_bounds.boundary_radius){
             // Side Collision
@@ -111,7 +157,7 @@ navigation::PathOption EvaluatePathWithPoint(const PathBoundaries &collision_bou
         }
         else{
             // No Collision, Outer Miss
-            path_result.clearance = collision_bounds.max_radius - collision_bounds.min_radius;
+            // path_result.clearance = radius_to_obstacle - collision_bounds.max_radius;
         }
         return path_result;
 }

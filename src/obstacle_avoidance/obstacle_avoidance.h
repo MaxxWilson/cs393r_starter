@@ -67,14 +67,23 @@ bool IsPointCollisionPossible(float curvature, const Eigen::Vector2f &point);
 
 /**
  * Evaluates path (defined mainly by curvature) over vector of points in point cloud,
- * updating path_option (including free_path_length, clearance, etc.) based on sensor data.
+ * updating path_option (including free_path_length, etc.) based on sensor data.
  * 
  * @param path_option       updated by function with path values determined from point cloud
  * @param collision_bounds  contains parameters defining radial boundaries for collision regions of a path
  * @param point_cloud_      reference to navigation.point_cloud_, vector of 2D obstacle points
  */
 void EvaluatePathWithPointCloud(navigation::PathOption &path_option, const PathBoundaries &collision_bounds, std::vector<Eigen::Vector2f> &point_cloud_);
-
+/**
+ * Evaluates path (defined mainly by curvature) over vector of points in point cloud,
+ * updating path_option (including free_path_length, etc.) based on sensor data.
+ * 
+ * @param path_option       updated by function with path values determined from point cloud
+ * @param collision_bounds  contains parameters defining radial boundaries for collision regions of a path
+ * @param point_cloud_      reference to navigation.point_cloud_, vector of 2D obstacle points
+ */
+void EvaluateClearanceWithPointCloud(navigation::PathOption &path_option, const PathBoundaries &collision_bounds, std::vector<Eigen::Vector2f> &point_cloud_);
+float EvaluateClearanceWithPoint(const PathBoundaries &collision_bounds, const navigation::PathOption &path_option, float angle_to_obstacle, Eigen::Vector2f point);
 /**
  * Evaluates path with specific point, checking for collision, clearance, and distance to goal.
  * 

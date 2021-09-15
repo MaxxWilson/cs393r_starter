@@ -59,6 +59,8 @@ class Navigation {
   // Updates based on an observed laser scan
   void ObservePointCloud(const std::vector<Eigen::Vector2f>& cloud,
                          double time);
+  
+  double sineVel(double index);
 
   // Main function called continously from main
   void Run();

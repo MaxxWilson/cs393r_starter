@@ -38,15 +38,16 @@ const float max_curvature = 0.5;
 const float min_curvature = -0.5;
 
 // Dynamics
-const float max_acceleration = 5.0;
-const float min_acceleration = -5.0;
+const float max_acceleration = 1.865;
+const float min_acceleration = -1.171;
 const float max_velocity = 1.0;
 
 // Algorithmic Parameters
 const float safe_distance = 0.2; // safe distance used in TOC control
 const float max_path_length = 5.0;
-const float curvature_increment = 0.01;
+const float curvature_increment = 0.05;
 const float num_curves = floor((max_curvature - min_curvature)/curvature_increment) + 1;
+const float clearance_factor = 0.15;
 }
 
 #endif // CAR_PARAMS_H
