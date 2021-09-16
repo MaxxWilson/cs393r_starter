@@ -83,7 +83,7 @@ void EvaluatePathWithPointCloud(navigation::PathOption &path_option, const PathB
  * @param point_cloud_      reference to navigation.point_cloud_, vector of 2D obstacle points
  */
 void EvaluateClearanceWithPointCloud(navigation::PathOption &path_option, const PathBoundaries &collision_bounds, std::vector<Eigen::Vector2f> &point_cloud_);
-float EvaluateClearanceWithPoint(const PathBoundaries &collision_bounds, const navigation::PathOption &path_option, float angle_to_obstacle, Eigen::Vector2f point);
+float EvaluateClearanceWithPoint(const PathBoundaries &collision_bounds, const navigation::PathOption &path_option, Eigen::Vector2f point);
 /**
  * Evaluates path with specific point, checking for collision, clearance, and distance to goal.
  * 
@@ -156,5 +156,6 @@ float GetPathLengthToFrontCollision(float radius_to_collision, float angle_to_ob
  */
 float GetCurvatureOptionFromRange(float desired_val_index, float req_val, float min_val, float increment);
 
+void LimitFreePath(navigation::PathOption& path,const Eigen::Vector2f& goal);
 } // namespace obstacle_avoidance
 #endif // OBSTACLE_AVOIDANCE_H

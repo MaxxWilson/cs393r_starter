@@ -47,7 +47,7 @@ const float safe_distance = 0.2; // safe distance used in TOC control
 const float max_path_length = 5.0;
 const float curvature_increment = 0.05;
 const float num_curves = floor((max_curvature - min_curvature)/curvature_increment) + 1;
-const float clearance_factor = 0.15;
+const float clearance_factor = 1;
 }
 
 #endif // CAR_PARAMS_H

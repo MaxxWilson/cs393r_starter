@@ -129,7 +129,6 @@ double Navigation::sineVel(double index){
 
 void Navigation::Run() {
   // This function gets called 20 times a second to form the control loop.
-  
   static float index = 0; 
   index += 3.14/48;
   // Clear previous visualizations.
@@ -139,7 +138,7 @@ void Navigation::Run() {
   // If odometry has not been initialized, we can't do anything.
   if (!odom_initialized_) return;
 
-  //std::cout << ros::Time::now().toNSec() << ", " << robot_vel_[0] << ", " << robot_vel_[1] << std::endl;
+  // std::cout << ros::Time::now().toNSec() << ", " << robot_vel_[0] << ", " << robot_vel_[1] << std::endl;
 
   /// Control Loop ///
 
@@ -147,7 +146,7 @@ void Navigation::Run() {
   // 2) Transform point cloud and goal point to predicted base_link frame at time=t+latency? (MELISSA)
   // 3) Calculate curvature to goal point (For assignment 1, its always zero, but will need in future) (MAXX)
 
-    Eigen::Vector2f goal_point(4, 0.0);
+    Eigen::Vector2f goal_point(-4, 0.0);
 
     float goal_curvature = obstacle_avoidance::GetCurvatureFromGoalPoint(goal_point);
     goal_curvature = Clamp(goal_curvature, car_params::min_curvature, car_params::max_curvature);
@@ -171,12 +170,15 @@ void Navigation::Run() {
         Eigen::Vector2f(0, 0)};       // closest point
 
       obstacle_avoidance::EvaluatePathWithPointCloud(path_options[curve_index], collision_bounds, point_cloud_);
+      obstacle_avoidance::LimitFreePath(path_options[curve_index], goal_point);
       obstacle_avoidance::EvaluateClearanceWithPointCloud(path_options[curve_index], collision_bounds, point_cloud_);
       // Visualization test code
       
       visualization::DrawPathOption(path_options[curve_index].curvature, path_options[curve_index].free_path_length, path_options[curve_index].clearance, local_viz_msg_);
       visualization::DrawCross(path_options[curve_index].obstruction, 0.1,  0x0046FF, local_viz_msg_);
     }
+    obstacle_avoidance::GoalOutliner(goal_point, local_viz_msg_);
+    obstacle_avoidance::CarOutliner(local_viz_msg_);
     //auto end_time = ros::Time::now().toSec();
     //std::cout << end_time - start_time << std::endl;
     // visualization::DrawPathOption(0, 10, 1, local_viz_msg_);
