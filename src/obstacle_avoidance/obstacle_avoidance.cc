@@ -22,6 +22,8 @@
 #include "obstacle_avoidance/obstacle_avoidance.h"
 #include "obstacle_avoidance/car_params.h"
 
+namespace obstacle_avoidance{
+
 // Uses curvature and point cloud to calculate path option info
 struct navigation::PathOption EvaluatePath(float curvature, std::vector<Eigen::Vector2f> point_cloud){
     struct navigation::PathOption path;
@@ -65,3 +67,20 @@ struct navigation::PathOption EvaluatePath(float curvature, std::vector<Eigen::V
 float GetCurvatureFromGoalPoint(Eigen::Vector2f point){
     return 0.0;
 }
+
+//Cleans when updated time variable is passed in
+void CleanVelocityBuffer(std::vector<navigation::CommandStamped> &v, uint64_t time){
+  auto it = std::lower_bound(v.begin(), v.end(), time);
+  v.erase(v.begin(), it-1);
+}
+
+//Integrates from one time stamp to the next
+//Returns float
+float Integrate(uint64_t point_cloud_stamp_, std::vector<navigation::CommandStamped> &v){
+    int it = std::lower_bound(v.begin(), v.end(), point_cloud_stamp_) - v.begin();
+    // std::cout << "    point_cloud_stamp: " <<  point_cloud_stamp_ << "\n";
+    // std::cout << "    ros::Time::now(): " <<  ros::Time::now().toNSec() << "\n";
+    // std::cout << "    del_t(ns): " << ros::Time::now().toNSec() -  point_cloud_stamp_ << "\n";
+    return (v[it].velocity) * pow(10.0, -9.0) * (car_params::sys_latency);
+}
+} //namespace obstacle_avoidance

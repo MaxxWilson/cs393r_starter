@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "eigen3/Eigen/Dense"
+#include "ros/ros.h"
 
 #ifndef NAVIGATION_H
 #define NAVIGATION_H
@@ -41,6 +42,25 @@ struct PathOption {
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
 };
 
+struct CommandStamped{
+  float velocity = 0.0;
+  float curvature = 0.0;
+  uint64_t stamp = 0.0;
+
+  CommandStamped(){};
+
+  CommandStamped(float velocity, float curvature, uint64_t stamp){
+    this->velocity = velocity;
+    this->curvature = curvature;
+    this->stamp = stamp;
+  }
+
+  bool operator <(const uint64_t time_compare)
+  {
+    return this->stamp < time_compare;
+  }
+};
+
 class Navigation {
  public:
 
@@ -54,16 +74,25 @@ class Navigation {
   void UpdateOdometry(const Eigen::Vector2f& loc,
                       float angle,
                       const Eigen::Vector2f& vel,
-                      float ang_vel);
+                      float ang_vel,
+                      ros::Time time);
 
   // Updates based on an observed laser scan
   void ObservePointCloud(const std::vector<Eigen::Vector2f>& cloud,
-                         double time);
+                         uint64_t time);
 
   // Main function called continously from main
   void Run();
   // Used to set the next target pose.
   void SetNavGoal(const Eigen::Vector2f& loc, float angle);
+
+  
+  Eigen::Vector2f latency_transform;
+
+  std::vector<CommandStamped> vel_commands_;
+
+  Eigen::Vector2f predicted_state;                       
+
 
  private:
 
@@ -87,10 +116,19 @@ class Navigation {
   Eigen::Vector2f odom_start_loc_;
   // Odometry-reported robot starting angle.
   float odom_start_angle_;
+  // Last odometry timestamp
+  uint64_t odom_stamp_;
+  //Updates if odometry has new data
+  bool has_new_odom_;
+
   // Latest observed point cloud.
   std::vector<Eigen::Vector2f> point_cloud_;
-
+  //Point cloud timestamp
+  uint64_t point_cloud_stamp_;
+  //True if point cloud is updated
+  bool has_new_points_;
   // Whether navigation is complete.
+
   bool nav_complete_;
   // Navigation goal location.
   Eigen::Vector2f nav_goal_loc_;
