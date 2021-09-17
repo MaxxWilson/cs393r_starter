@@ -86,13 +86,10 @@ class Navigation {
   // Used to set the next target pose.
   void SetNavGoal(const Eigen::Vector2f& loc, float angle);
 
-  
-  Eigen::Vector2f latency_transform;
+  // Use time optimal strategy to control the car
+  void TimeOptimalControl(const PathOption& path);
 
   std::vector<CommandStamped> vel_commands_;
-
-  Eigen::Vector2f predicted_state;                       
-
 
  private:
 
