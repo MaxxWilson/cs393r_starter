@@ -95,19 +95,22 @@ void LaserCallback(const sensor_msgs::LaserScan& msg) {
     point_cloud_[i] = Vector2f(x, y);
   }
 
-  navigation_->ObservePointCloud(point_cloud_, msg.header.stamp.toSec());
+  navigation_->ObservePointCloud(point_cloud_, msg.header.stamp.toNSec());
   last_laser_msg_ = msg;
 }
 
 void OdometryCallback(const nav_msgs::Odometry& msg) {
+ // msg.header.stamp = ros::Time::now();
   if (FLAGS_v > 0) {
     printf("Odometry t=%f\n", msg.header.stamp.toSec());
   }
+  
   navigation_->UpdateOdometry(
       Vector2f(msg.pose.pose.position.x, msg.pose.pose.position.y),
       2.0 * atan2(msg.pose.pose.orientation.z, msg.pose.pose.orientation.w),
       Vector2f(msg.twist.twist.linear.x, msg.twist.twist.linear.y),
-      msg.twist.twist.angular.z);
+      msg.twist.twist.angular.z,
+      msg.header.stamp);
 }
 
 void GoToCallback(const geometry_msgs::PoseStamped& msg) {
