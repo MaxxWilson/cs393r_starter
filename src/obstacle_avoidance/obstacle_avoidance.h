@@ -73,17 +73,9 @@ bool IsPointCollisionPossible(float curvature, const Eigen::Vector2f &point);
  * @param collision_bounds  contains parameters defining radial boundaries for collision regions of a path
  * @param point_cloud_      reference to navigation.point_cloud_, vector of 2D obstacle points
  */
-void EvaluatePathWithPointCloud(navigation::PathOption &path_option, const PathBoundaries &collision_bounds, std::vector<Eigen::Vector2f> &point_cloud_);
-/**
- * Evaluates path (defined mainly by curvature) over vector of points in point cloud,
- * updating path_option (including free_path_length, etc.) based on sensor data.
- * 
- * @param path_option       updated by function with path values determined from point cloud
- * @param collision_bounds  contains parameters defining radial boundaries for collision regions of a path
- * @param point_cloud_      reference to navigation.point_cloud_, vector of 2D obstacle points
- */
-void EvaluateClearanceWithPointCloud(navigation::PathOption &path_option, const PathBoundaries &collision_bounds, std::vector<Eigen::Vector2f> &point_cloud_);
-float EvaluateClearanceWithPoint(const PathBoundaries &collision_bounds, const navigation::PathOption &path_option, Eigen::Vector2f point);
+void EvaluatePathWithPointCloud(navigation::PathOption &path_option, const PathBoundaries &collision_bounds, const std::vector<Eigen::Vector2f> &point_cloud_);
+
+
 /**
  * Evaluates path with specific point, checking for collision, clearance, and distance to goal.
  * 
@@ -101,16 +93,7 @@ navigation::PathOption EvaluatePathWithPoint(const PathBoundaries &collision_bou
  */
 float GetCurvatureFromGoalPoint(Eigen::Vector2f point);
 
-// visualization functions
-// call the other visualization functions to visualize all the information needed for obstacle avoidance
-void VisualizeObstacleAvoidanceInfo(Eigen::Vector2f& goal,
-                           std::vector<navigation::PathOption>& paths,
-                           const navigation::PathOption& selected_path,
-                           amrl_msgs::VisualizationMsg &msg);
-void CarOutliner(amrl_msgs::VisualizationMsg& msg);
-void PossiblePathsOutliner(const std::vector<navigation::PathOption>& paths,amrl_msgs::VisualizationMsg& msg);
-void SelectedPathOutliner(const navigation::PathOption& selected_path,amrl_msgs::VisualizationMsg& msg);
-void GoalOutliner(Eigen::Vector2f& goal, amrl_msgs::VisualizationMsg& msg);
+
 
 /**
  * For Side Collision, calculate Free Path Length to obstacle.
@@ -157,5 +140,18 @@ float GetPathLengthToFrontCollision(float radius_to_collision, float angle_to_ob
 float GetCurvatureOptionFromRange(float desired_val_index, float req_val, float min_val, float increment);
 
 void LimitFreePath(navigation::PathOption& path,const Eigen::Vector2f& goal);
+struct navigation::PathOption ChooseBestPath(std::vector<navigation::PathOption>& paths, const Eigen::Vector2f& goal);
+void EvaluateClearanceWithPointCloud(navigation::PathOption &path_option, const PathBoundaries &collision_bounds, const std::vector<Eigen::Vector2f> &point_cloud_);
+float EvaluateClearanceWithPoint(const PathBoundaries &collision_bounds, const navigation::PathOption &path_option, Eigen::Vector2f point);
+// visualization functions
+// call the other visualization functions to visualize all the information needed for obstacle avoidance
+void VisualizeObstacleAvoidanceInfo(Eigen::Vector2f& goal,
+                           std::vector<navigation::PathOption>& paths,
+                           const navigation::PathOption& selected_path,
+                           amrl_msgs::VisualizationMsg &msg);
+void CarOutliner(amrl_msgs::VisualizationMsg& msg);
+void PossiblePathsOutliner(const std::vector<navigation::PathOption>& paths,amrl_msgs::VisualizationMsg& msg);
+void SelectedPathOutliner(const navigation::PathOption& selected_path,amrl_msgs::VisualizationMsg& msg);
+void GoalOutliner(Eigen::Vector2f& goal, amrl_msgs::VisualizationMsg& msg);
 } // namespace obstacle_avoidance
 #endif // OBSTACLE_AVOIDANCE_H
