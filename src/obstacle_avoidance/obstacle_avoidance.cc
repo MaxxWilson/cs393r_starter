@@ -25,6 +25,7 @@
 
 #include "obstacle_avoidance/obstacle_avoidance.h"
 
+
 #include <float.h>
 #include "shared/math/line2d.h"
 
@@ -303,4 +304,21 @@ void SelectedPathOutliner(const navigation::PathOption& selected_path,amrl_msgs:
 void GoalOutliner(Eigen::Vector2f& goal, amrl_msgs::VisualizationMsg& msg){
     visualization::DrawCross(goal,0.5,0xfc4103,msg);
 }
-} // namespace obstacle_avoidance
+
+//Cleans when updated time variable is passed in
+void CleanVelocityBuffer(std::vector<navigation::CommandStamped> &v, uint64_t time){
+  auto it = std::lower_bound(v.begin(), v.end(), time);
+  v.erase(v.begin(), it-1);
+}
+
+//Integrates from one time stamp to the next
+//Returns float
+float Integrate(uint64_t point_cloud_stamp_, std::vector<navigation::CommandStamped> &v){
+    int it = std::lower_bound(v.begin(), v.end(), point_cloud_stamp_) - v.begin();
+    // std::cout << "    point_cloud_stamp: " <<  point_cloud_stamp_ << "\n";
+    // std::cout << "    ros::Time::now(): " <<  ros::Time::now().toNSec() << "\n";
+    // std::cout << "    del_t(ns): " << ros::Time::now().toNSec() -  point_cloud_stamp_ << "\n";
+    return (v[it].velocity) * pow(10.0, -9.0) * (car_params::sys_latency);
+}
+} //namespace obstacle_avoidance
+

@@ -75,6 +75,8 @@ Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
   global_viz_msg_ = visualization::NewVisualizationMessage(
       "map", "navigation_global");
   InitRosHeader("base_link", &drive_msg_.header);
+
+  vel_commands_ = std::vector<CommandStamped>(10);
 }
 
 void Navigation::SetNavGoal(const Vector2f& loc, float angle) {
@@ -89,7 +91,8 @@ void Navigation::UpdateLocation(const Eigen::Vector2f& loc, float angle) {
 void Navigation::UpdateOdometry(const Vector2f& loc,
                                 float angle,
                                 const Vector2f& vel,
-                                float ang_vel) {
+                                float ang_vel,
+                                ros::Time time) {
   robot_omega_ = ang_vel;
   robot_vel_ = vel;
   if (!odom_initialized_) {
@@ -100,11 +103,16 @@ void Navigation::UpdateOdometry(const Vector2f& loc,
   }
   odom_loc_ = loc;
   odom_angle_ = angle;
+  odom_stamp_ = time.toNSec();
+  has_new_odom_ = true;
 }
 
 void Navigation::ObservePointCloud(const vector<Vector2f>& cloud,
-                                   double time) {
-  point_cloud_ = cloud;                                     
+                                   uint64_t time) {
+  point_cloud_ = cloud;
+  point_cloud_stamp_ = time;
+  has_new_points_= true;
+  //std::cout << "points!" << "\n";
 }
 
 //Solve the TOC Problem
@@ -128,17 +136,16 @@ double Navigation::sineVel(double index){
 //Show all the obstacles
 
 void Navigation::Run() {
-  // This function gets called 20 times a second to form the control loop.
-  static float index = 0; 
-  index += 3.14/48;
+  //This function gets called 20 times a second to form the control loop.
+  //Time at begnning of control loop, defined for latency function
+  //uint64_t start_loop_time = ros::Time::now().toNSec();
+  
   // Clear previous visualizations.
   visualization::ClearVisualizationMsg(local_viz_msg_);
   visualization::ClearVisualizationMsg(global_viz_msg_);
 
-  // If odometry has not been initialized, we can't do anything.
+    // If odometry has not been initialized, we can't do anything.
   if (!odom_initialized_) return;
-
-  // std::cout << ros::Time::now().toNSec() << ", " << robot_vel_[0] << ", " << robot_vel_[1] << std::endl;
 
   /// Control Loop ///
 
@@ -189,14 +196,37 @@ void Navigation::Run() {
   drive_msg_.curvature = 0.0;
   drive_msg_.velocity = sineVel(index);
   // std::cout << "Velocity: " << drive_msg_.velocity << "  Reported Velocity: " << robot_vel_[0] << "  Index: " << index << "\n" ;
+
+  obstacle_avoidance::CleanVelocityBuffer(vel_commands_, std::min(point_cloud_stamp_, odom_stamp_));
+
+  if(has_new_points_){
+      float points_del_x = obstacle_avoidance::Integrate(point_cloud_stamp_, vel_commands_);
+      std::cout<< "points del_x (m): " << points_del_x << "\n";
+      has_new_points_ = false;
+  }
+
+  if(has_new_odom_){
+      float odom_del_x = obstacle_avoidance::Integrate(odom_stamp_, vel_commands_);
+      std::cout<< "odom del_x (m): " << odom_del_x << "\n";
+      has_new_odom_ = false;
+  }
+
   // Add timestamps to all messages.
   local_viz_msg_.header.stamp = ros::Time::now();
   global_viz_msg_.header.stamp = ros::Time::now();
   drive_msg_.header.stamp = ros::Time::now();
+
+  CommandStamped drive_cmd(drive_msg_.curvature, drive_msg_.velocity, drive_msg_.header.stamp.toNSec());
+  vel_commands_.push_back(drive_cmd);
+
+  //uint64_t last_loop_time = ros::Time::now().toNSec() - start_loop_time;
   // Publish messages.
   viz_pub_.publish(local_viz_msg_);
   viz_pub_.publish(global_viz_msg_);
-  // drive_pub_.publish(drive_msg_);
+
+  //Time at end of control loop, defined for latency function
+  // ros::Time t_end_control_function = ros::Time::now();
+
 }
 
 }  // namespace navigation
