@@ -49,7 +49,7 @@ struct CommandStamped{
 
   CommandStamped(){};
 
-  CommandStamped(float velocity, float curvature, uint64_t stamp){
+  CommandStamped(double velocity, float curvature, uint64_t stamp){
     this->velocity = velocity;
     this->curvature = curvature;
     this->stamp = stamp;
@@ -88,6 +88,10 @@ class Navigation {
 
   // Use time optimal strategy to control the car
   void TimeOptimalControl(const PathOption& path);
+
+  void TransformPointCloud(float del_x, float del_y);
+
+  void TransformOdom(float del_x, float del_y);
 
   std::vector<CommandStamped> vel_commands_;
 

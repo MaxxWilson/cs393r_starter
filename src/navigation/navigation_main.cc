@@ -71,8 +71,6 @@ DEFINE_string(init_topic,
 DEFINE_string(map, "maps/GDC1.txt", "Name of vector map file");
 
 
-
-
 bool run_ = true;
 sensor_msgs::LaserScan last_laser_msg_;
 Navigation* navigation_ = nullptr;
@@ -107,7 +105,8 @@ void OdometryCallback(const nav_msgs::Odometry& msg) {
   if (FLAGS_v > 0) {
     printf("Odometry t=%f\n", msg.header.stamp.toSec());
   }
-  
+
+
   navigation_->UpdateOdometry(
       Vector2f(msg.pose.pose.position.x, msg.pose.pose.position.y),
       2.0 * atan2(msg.pose.pose.orientation.z, msg.pose.pose.orientation.w),
@@ -162,6 +161,8 @@ int main(int argc, char** argv) {
     ros::spinOnce();
     navigation_->Run();
     loop.Sleep();
+
+    //ros::Duration(.215).sleep();
   }
   delete navigation_;
   return 0;
