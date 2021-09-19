@@ -31,7 +31,6 @@
 #define OBSTACLE_AVOIDANCE_H
 
 namespace obstacle_avoidance{
-
 struct PathBoundaries{
     float curvature = 0.0;
     float min_radius = 0.0;
@@ -156,5 +155,24 @@ void CarOutliner(amrl_msgs::VisualizationMsg& msg);
 void PossiblePathsOutliner(const std::vector<navigation::PathOption>& paths,amrl_msgs::VisualizationMsg& msg);
 void SelectedPathOutliner(const navigation::PathOption& selected_path,amrl_msgs::VisualizationMsg& msg);
 void GoalOutliner(Eigen::Vector2f& goal, amrl_msgs::VisualizationMsg& msg);
-} // namespace obstacle_avoidance
+
+void EvaluatePathLength(struct navigation::PathOption path, std::vector<Eigen::Vector2f> point_cloud);
+
+void CleanVelocityBuffer(std::vector<navigation::CommandStamped> &v, uint64_t time);
+
+// Given a goal point in base_link frame, return a curvature path that intersects the point
+float GetCurvatureFromGoalPoint(Eigen::Vector2f point);
+
+//Integrates state 
+Eigen::Vector2f Integrate(uint64_t time, std::vector<navigation::CommandStamped> &v, float robot_angle);
+
+// Visualization for needed for latency
+void VisualizeLatencyInfo(amrl_msgs::VisualizationMsg &msg, std::vector<Eigen::Vector2f> &point_cloud, Eigen::Vector2f odom_loc, float odom_angle); 
+
+// Outline forward-predicted position of point cloud [blue]
+void LatencyPointCloud(amrl_msgs::VisualizationMsg &msg, std::vector<Eigen::Vector2f>& point_cloud);
+// Outline forward-predicted position of car [blue]
+void LatencyCar(amrl_msgs::VisualizationMsg &msg, Eigen::Vector2f odom_loc, float tht);
+}                    
+
 #endif // OBSTACLE_AVOIDANCE_H

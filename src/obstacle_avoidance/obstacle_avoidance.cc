@@ -25,6 +25,7 @@
 
 #include "obstacle_avoidance/obstacle_avoidance.h"
 
+
 #include <float.h>
 #include "shared/math/line2d.h"
 
@@ -36,6 +37,7 @@ DEFINE_double(clearance_param,3.0,"clearance parameter used in scoring function"
 DEFINE_double(distance_goal_param,-0.1,"distance to goal parameter used in scoring function");
 
 using namespace math_util;
+
 namespace obstacle_avoidance{
 
 bool IsPointCollisionPossible(float curvature, const Eigen::Vector2f &point){
@@ -303,4 +305,57 @@ void SelectedPathOutliner(const navigation::PathOption& selected_path,amrl_msgs:
 void GoalOutliner(Eigen::Vector2f& goal, amrl_msgs::VisualizationMsg& msg){
     visualization::DrawCross(goal,0.5,0xfc4103,msg);
 }
-} // namespace obstacle_avoidance
+
+//Cleans when updated time variable is passed in
+void CleanVelocityBuffer(std::vector<navigation::CommandStamped> &v, uint64_t time){
+  auto it = std::lower_bound(v.begin(), v.end(), time);
+  v.erase(v.begin(), it-1);
+}
+
+//Integrates from one time stamp to the next
+//Returns float &point_cloud_stamp_ failed linker????
+Eigen::Vector2f Integrate(uint64_t stamp, std::vector<navigation::CommandStamped> &v, float angle){
+    int it = std::lower_bound(v.begin(), v.end(), stamp) - v.begin();
+    // std::cout << "    stamp: " <<  stamp << "\n";
+    // std::cout << "    ros::Time::now(): " <<  ros::Time::now().toNSec() << "\n";
+    // std::cout << "    del_t(ns): " << ros::Time::now().toNSec() -  stamp << "\n";
+    float del_x = (v[it].velocity * cos(angle)) * pow(10.0, -9.0) * (car_params::sys_latency);//sys_latency in ns
+    float del_y = (v[it].velocity) * sin(angle) * pow(10.0, -9.0) * (car_params::sys_latency);
+    return Eigen::Vector2f(del_x, del_y);
+}
+
+
+// Outline forward-predicted position of car [blue]
+// odom_del is literally so small that latency car does not show up on sim. Overlaps with real car
+void LatencyCar(amrl_msgs::VisualizationMsg &msg, Eigen::Vector2f odom_del, float tht){
+    std::cout<<"    odom_del" << odom_del << "\n";
+    Eigen::Vector2f front_left((car_params::wheel_base+car_params::length)/2 + odom_del[0] / cos(tht), (car_params::width + odom_del[1])/(2  * sin(tht)));
+    Eigen::Vector2f front_right((car_params::wheel_base+car_params::length)/2 + odom_del[0] / cos(tht), (-car_params::width + odom_del[1])/(2  * sin(tht)));
+    Eigen::Vector2f back_left(-(car_params::length-car_params::wheel_base)/2  + odom_del[0] / cos(tht), (car_params::width  + odom_del[1])/(2 * sin(tht)));
+    Eigen::Vector2f back_right(-(car_params::length-car_params::wheel_base)/2  + odom_del[0] / cos(tht) ,(-car_params::width  + odom_del[1])/(2  * sin(tht)));
+    //car front
+    visualization::DrawLine(front_left, front_right,0x1e9aa8,msg);
+    //car back
+    visualization::DrawLine(back_left , back_right,0x1e9aa8,msg);
+    //car left
+    visualization::DrawLine(front_left, back_left,0x1e9aa8,msg);
+    //car right
+    visualization::DrawLine(front_right,back_right,0x1e9aa8,msg);
+    visualization::DrawLine(front_right, back_left  ,0x1e9aa8,msg);
+
+}
+
+// Outline forward-predicted position of point cloud [blue]
+void LatencyPointCloud(amrl_msgs::VisualizationMsg &msg, std::vector<Eigen::Vector2f>& point_cloud){
+  for(std::size_t i = 0; i < point_cloud.size(); i++){
+    visualization::DrawPoint(point_cloud[i], 0x1e9aa8, msg);
+  }
+}
+
+// Visualization for needed for latency
+void VisualizeLatencyInfo(amrl_msgs::VisualizationMsg &msg, std::vector<Eigen::Vector2f> &point_cloud, Eigen::Vector2f odom_loc, float odom_angle){
+    LatencyCar(msg, odom_loc, odom_angle);
+    LatencyPointCloud(msg, point_cloud);
+}
+} //namespace obstacle_avoidance
+

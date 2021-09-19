@@ -42,12 +42,18 @@ const float max_acceleration = 4.0; //1.865;
 const float min_acceleration = -4.0; //-1.171;
 const float max_velocity = 0.4;
 
+
 // Algorithmic Parameters
 const float safe_distance = 0.05; // safe distance used in TOC control, stops with 5" left to obstacle
 const float max_path_length = 7.0;
 const float curvature_increment = 0.02;
 const float num_curves = floor((max_curvature - min_curvature)/curvature_increment) + 1;
+
 const float clearance_factor = car_params::width/2 + car_params::safety_margin + 0.1; // ~6"
+
+//Latency 
+const float sys_latency = .215 * pow(10, 9); //(ns)
+
 }
 
 #endif // CAR_PARAMS_H
