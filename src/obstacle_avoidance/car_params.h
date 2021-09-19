@@ -26,28 +26,28 @@
 namespace car_params{
 
 // Geometry
-const float length = 0.535;
-const float width = 0.281;
-const float wheel_base = 0.5;
-const float track_width = 0.25;
-const float safety_margin = 0.05;
+const float length = 0.508; // 20"
+const float width = 0.2667; // 10.5"
+const float wheel_base = 0.32385; // 12.75"
+const float track_width = 0.235; // 9.25
+const float safety_margin = 0.05; // 2"
 
 const float dist_to_front_bumper = (length + wheel_base)/2 + safety_margin;
 
-const float max_curvature = 0.5;
-const float min_curvature = -0.5;
+const float max_curvature = 0.6;
+const float min_curvature = -0.6;
 
 // Dynamics
-const float max_acceleration = 1.865;
-const float min_acceleration = -1.171;
+const float max_acceleration = 4.0; //1.865;
+const float min_acceleration = -4.0; //-1.171;
 const float max_velocity = 1.0;
 
 // Algorithmic Parameters
-const float safe_distance = 0.2; // safe distance used in TOC control
+const float safe_distance = 0.125; // safe distance used in TOC control, stops with 5" left to obstacle
 const float max_path_length = 5.0;
 const float curvature_increment = 0.05;
 const float num_curves = floor((max_curvature - min_curvature)/curvature_increment) + 1;
-const float clearance_factor = 1;
+const float clearance_factor = 0.15; // ~6"
 }
 
 #endif // CAR_PARAMS_H

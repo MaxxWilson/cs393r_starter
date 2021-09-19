@@ -32,7 +32,7 @@
 
 
 // line arguments used in obstacle avoidance function
-DEFINE_double(clearance_param,0.1,"clearance parameter used in scoring function");
+DEFINE_double(clearance_param,0.2,"clearance parameter used in scoring function");
 DEFINE_double(distance_goal_param,-0.1,"distance to goal parameter used in scoring function");
 
 using namespace math_util;

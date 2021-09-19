@@ -181,6 +181,8 @@ void Navigation::Run() {
   
   // 7) Select best path from scoring function (Easy, YUHONG)
   struct PathOption best_path = obstacle_avoidance::ChooseBestPath(path_options,goal_point);
+
+  std::cout << "Length, Clearance, Dist: " << best_path.free_path_length << ", " << 10.0 * best_path.clearance << ", " << -0.1 * obstacle_avoidance::GetDistanceToGoal(best_path,goal_point) << std::endl;
   
   obstacle_avoidance::VisualizeObstacleAvoidanceInfo(goal_point,path_options,best_path,local_viz_msg_);
   // 8) Publish commands with 1-D TOC (YUHONG)s

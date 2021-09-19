@@ -55,6 +55,9 @@ struct PathBoundaries{
     }
 };
 
+// temporary
+double GetDistanceToGoal(const navigation::PathOption& path,const Eigen::Vector2f& goal);
+
 /**
  * Implements computationally cheap methods to rule out certain points, saving more expensive searches
  * Includes skipping points behind the car, points that the car will turn away from, and points outside the search radius.
