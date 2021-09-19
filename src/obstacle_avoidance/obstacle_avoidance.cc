@@ -45,7 +45,7 @@ bool IsPointCollisionPossible(float curvature, const Eigen::Vector2f &point){
         // Ignore points behind car
         return false;
     }
-    else if(Sign(curvature)*point[1] < -(car_params::width + car_params::safety_margin + car_params::clearance_factor)){
+    else if(Sign(curvature)*point[1] < -car_params::clearance_factor)){ //-(car_params::width/2 + car_params::safety_margin + car_params::clearance_factor)){
         // Ignore points in the direction opposite of curvature
         // (Can't hit any point to the left when turning right)
         return false;
