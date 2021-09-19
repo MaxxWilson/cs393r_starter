@@ -33,7 +33,7 @@
 
 
 // line arguments used in obstacle avoidance function
-DEFINE_double(clearance_param,0.1,"clearance parameter used in scoring function");
+DEFINE_double(clearance_param,3.0,"clearance parameter used in scoring function");
 DEFINE_double(distance_goal_param,-0.1,"distance to goal parameter used in scoring function");
 
 using namespace math_util;
@@ -47,7 +47,7 @@ bool IsPointCollisionPossible(float curvature, const Eigen::Vector2f &point){
         // Ignore points behind car
         return false;
     }
-    else if(Sign(curvature)*point[1] < -(car_params::width + car_params::safety_margin + car_params::clearance_factor)){
+    else if(Sign(curvature)*point[1] < -car_params::clearance_factor){ //-(car_params::width/2 + car_params::safety_margin + car_params::clearance_factor)){
         // Ignore points in the direction opposite of curvature
         // (Can't hit any point to the left when turning right)
         return false;
