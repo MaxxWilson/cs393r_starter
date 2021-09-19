@@ -51,7 +51,7 @@ const float num_curves = floor((max_curvature - min_curvature)/curvature_increme
 const float clearance_factor = 1;
 
 //Latency 
-const float sys_latency = .215; //(s)
+const float sys_latency = .215 * pow(10, 9); //(ns)
 
 }
 
