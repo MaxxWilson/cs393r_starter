@@ -315,7 +315,8 @@ void CleanVelocityBuffer(std::vector<navigation::CommandStamped> &v, uint64_t ti
 //Integrates from one time stamp to the next
 //Returns float &point_cloud_stamp_ failed linker????
 Eigen::Vector2f Integrate(uint64_t stamp, std::vector<navigation::CommandStamped> &v, float angle){
-    int it = std::lower_bound(v.begin(), v.end(), stamp) - v.begin();
+    int it = std::lower_bound(v.begin(), v.end(), stamp) - v.begin(); // Index of command before pc
+    //std::cout << v[it].velocity << std::endl;
     // std::cout << "    stamp: " <<  stamp << "\n";
     // std::cout << "    ros::Time::now(): " <<  ros::Time::now().toNSec() << "\n";
     // std::cout << "    del_t(ns): " << ros::Time::now().toNSec() -  stamp << "\n";
@@ -328,7 +329,7 @@ Eigen::Vector2f Integrate(uint64_t stamp, std::vector<navigation::CommandStamped
 // Outline forward-predicted position of car [blue]
 // odom_del is literally so small that latency car does not show up on sim. Overlaps with real car
 void LatencyCar(amrl_msgs::VisualizationMsg &msg, Eigen::Vector2f odom_del, float tht){
-    std::cout<<"    odom_del" << odom_del << "\n";
+    //std::cout<<"    odom_del" << odom_del << "\n";
     Eigen::Vector2f front_left((car_params::wheel_base+car_params::length)/2 + odom_del[0] / cos(tht), (car_params::width + odom_del[1])/(2  * sin(tht)));
     Eigen::Vector2f front_right((car_params::wheel_base+car_params::length)/2 + odom_del[0] / cos(tht), (-car_params::width + odom_del[1])/(2  * sin(tht)));
     Eigen::Vector2f back_left(-(car_params::length-car_params::wheel_base)/2  + odom_del[0] / cos(tht), (car_params::width  + odom_del[1])/(2 * sin(tht)));

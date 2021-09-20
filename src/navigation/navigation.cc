@@ -85,7 +85,7 @@ void Navigation::SetNavGoal(const Vector2f& loc, float angle) {
 void Navigation::UpdateLocation(const Eigen::Vector2f& loc, float angle) {
   localization_initialized_ = true;
   robot_loc_ = loc;
-  std::cout << "    robot location: " << robot_loc_ << "\n";
+  //std::cout << "    robot location: " << robot_loc_ << "\n";
   robot_angle_ = angle;
 }
 
@@ -93,7 +93,7 @@ void Navigation::UpdateOdometry(const Vector2f& loc,
                                 float angle,
                                 const Vector2f& vel,
                                 float ang_vel,
-                                ros::Time time) {
+                                uint64_t time) {
   robot_omega_ = ang_vel;
   robot_vel_ = vel;
   if (!odom_initialized_) {
@@ -104,15 +104,14 @@ void Navigation::UpdateOdometry(const Vector2f& loc,
   }
   odom_loc_ = loc;
   odom_angle_ = angle;
-    //std::cout<< "orientation: " << angle << "\n";
-  odom_stamp_ = time.toNSec();
+  odom_stamp_ = time - car_params::sensing_latency;
   has_new_odom_ = true;
 }
 
 void Navigation::ObservePointCloud(const vector<Vector2f>& cloud,
                                    uint64_t time) {
   point_cloud_ = cloud;
-  point_cloud_stamp_ = time;
+  point_cloud_stamp_ = time - car_params::sensing_latency;
   has_new_points_= true;
 }
 
@@ -131,36 +130,35 @@ void Navigation::TimeOptimalControl(const PathOption& path) {
 }
 
 void Navigation::TransformPointCloud(float del_x, float del_y){
-    // Location of the laser on the robot. Assumes the laser is forward-facing.
-  const Vector2f kLaserLoc(0.2, 0);
   // std::cout<<"point del: " << del_x << " " << del_y << "\n";
   for(std::size_t i = 0; i < point_cloud_.size(); i++){
 
     // Polar to Cartesian conversion, transforms to base link frame
     //float angle = msg.angle_min + msg.angle_increment*i;
-    float xT = point_cloud_[i][0] + del_x;
-    float yT = point_cloud_[i][1] + del_y;
+    float xT = point_cloud_[i][0] - del_x;
+    float yT = point_cloud_[i][1] - del_y;
     
     point_cloud_[i] = Vector2f(xT, yT);
   }
 
-  ObservePointCloud(point_cloud_, ros::Time::now().toNSec());
+  //ObservePointCloud(point_cloud_, ros::Time::now().toNSec());
 }
 
 void Navigation::TransformOdom(float del_x, float del_y){
-  std::cout << "Odom del x and y: " << del_x << " " << del_y << "\n";
+  //std::cout << "Odom del x and y: " << del_x << " " << del_y << "\n";
   UpdateOdometry(
       Vector2f(robot_loc_[0] + del_x, robot_loc_[1] + del_y),
       odom_angle_,
       robot_vel_,
       robot_omega_,
-      ros::Time::now());
+      ros::Time::now().toNSec());
 }
 
 void Navigation::Run() {
   //This function gets called 20 times a second to form the control loop.
   //Time at begnning of control loop, defined for latency function
-  //uint64_t start_loop_time = ros::Time::now().toNSec();
+  uint64_t start_loop_time = ros::Time::now().toNSec();
+  uint64_t actuation_time = start_loop_time + car_params::sys_latency; // TODO + EXEC TIME
   
   // Clear previous visualizations.
   visualization::ClearVisualizationMsg(local_viz_msg_);
@@ -168,10 +166,31 @@ void Navigation::Run() {
 
     // If odometry has not been initialized, we can't do anything.
   if (!odom_initialized_) return;
-  //Latency Compensation
-  obstacle_avoidance::CleanVelocityBuffer(vel_commands_, std::min(point_cloud_stamp_, odom_stamp_));
 
-  //If no new sensor data
+  //Latency Compensation
+  obstacle_avoidance::CleanVelocityBuffer(vel_commands_, odom_stamp_);
+
+  float future_odom = robot_vel_.norm()*(vel_commands_[1].stamp - odom_stamp_)*pow(10.0, -9.0); // TF from last odom to future
+  std::cout << "1 "<< future_odom << std::endl;
+  for(std::size_t i = 1; i < vel_commands_.size()-1; i++){
+    future_odom += vel_commands_[i].velocity*(vel_commands_[i+1].stamp - vel_commands_[i].stamp)*pow(10.0, -9.0);
+  }
+  future_odom += vel_commands_.back().velocity*(actuation_time - vel_commands_.back().stamp)*pow(10.0, -9.0);
+
+  std::cout << "2 "<< future_odom << std::endl;
+
+  // Future odom is good!
+
+  //auto odom_to_point_cloud = robot_vel_.norm()*(odom_stamp_ - point_cloud_stamp_)*pow(10.0, -9.0);
+
+  //auto future_point_cloud = future_odom + odom_to_point_cloud;
+
+  //std::cout << future_point_cloud << std::endl;
+
+  //TransformPointCloud(future_point_cloud, 0);
+
+  std::cout << "hasNew Points " << has_new_points_ << std::endl;));
+  If no new sensor data
   if(!has_new_points_){
       Eigen::Vector2f points_del = obstacle_avoidance::Integrate(drive_msg_.header.stamp.toNSec(), vel_commands_, robot_angle_);
       std::cout<< "no points! " << "\n";
@@ -185,8 +204,9 @@ void Navigation::Run() {
       TransformPointCloud(points_del[0], points_del[1]);
       obstacle_avoidance::VisualizeLatencyInfo(local_viz_msg_, point_cloud_, points_del, odom_angle_);
   }
-  //If new sensor data
+  If new sensor data
   if(has_new_points_){
+      std::cout << "New points" << std::endl;
       Eigen::Vector2f points_del = obstacle_avoidance::Integrate(point_cloud_stamp_, vel_commands_, robot_angle_);
       TransformPointCloud(points_del[0], points_del[1]);
       obstacle_avoidance::VisualizeLatencyInfo(local_viz_msg_, point_cloud_, points_del, odom_angle_);
@@ -197,7 +217,7 @@ void Navigation::Run() {
 
       Eigen::Vector2f odom_del = obstacle_avoidance::Integrate(odom_stamp_, vel_commands_, robot_angle_);;
       TransformOdom(odom_del[0], odom_del[1]);
-      std::cout << "    Odom Loc: " << odom_loc_ << "\n"; 
+      std::cout << "Odom Loc: " << odom_loc_ << "\n"; 
       obstacle_avoidance::VisualizeLatencyInfo(local_viz_msg_, point_cloud_, odom_del, odom_angle_);
       has_new_odom_ = false;
   }
@@ -244,7 +264,7 @@ void Navigation::Run() {
   struct PathOption best_path = obstacle_avoidance::ChooseBestPath(path_options,goal_point);
 
 
-  std::cout << "Length, Clearance, Dist: " << best_path.free_path_length << ", " << 2.5 * best_path.clearance << ", " << -0.1 * obstacle_avoidance::GetDistanceToGoal(best_path,goal_point) << std::endl;
+  //std::cout << "Length, Clearance, Dist: " << best_path.free_path_length << ", " << 2.5 * best_path.clearance << ", " << -0.1 * obstacle_avoidance::GetDistanceToGoal(best_path,goal_point) << std::endl;
   
   obstacle_avoidance::VisualizeObstacleAvoidanceInfo(goal_point,path_options,best_path,local_viz_msg_);
   // 8) Publish commands with 1-D TOC (YUHONG)s
@@ -255,7 +275,7 @@ void Navigation::Run() {
   global_viz_msg_.header.stamp = ros::Time::now();
   drive_msg_.header.stamp = ros::Time::now();
 
-  CommandStamped drive_cmd(drive_msg_.velocity, drive_msg_.curvature, drive_msg_.header.stamp.toNSec());
+  CommandStamped drive_cmd(drive_msg_.velocity, drive_msg_.curvature, drive_msg_.header.stamp.toNSec() + car_params::sys_latency);
   vel_commands_.push_back(drive_cmd);
 
   //uint64_t last_loop_time = ros::Time::now().toNSec() - start_loop_time;

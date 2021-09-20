@@ -40,7 +40,7 @@ const float min_curvature = -1.0;
 // Dynamics
 const float max_acceleration = 4.0; //1.865;
 const float min_acceleration = -4.0; //-1.171;
-const float max_velocity = 0.4;
+const float max_velocity = 1.0;
 
 
 // Algorithmic Parameters
@@ -52,7 +52,9 @@ const float num_curves = floor((max_curvature - min_curvature)/curvature_increme
 const float clearance_factor = car_params::width/2 + car_params::safety_margin + 0.1; // ~6"
 
 //Latency 
-const float sys_latency = .215 * pow(10, 9); //(ns)
+const float sys_latency = (.215) * pow(10, 9); //(ns)
+const float sensing_latency =  sys_latency/4;
+const float actuation_latency = 3*sys_latency/4;
 
 }
 

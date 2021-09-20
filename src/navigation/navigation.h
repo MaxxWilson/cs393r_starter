@@ -75,7 +75,7 @@ class Navigation {
                       float angle,
                       const Eigen::Vector2f& vel,
                       float ang_vel,
-                      ros::Time time);
+                      uint64_t time);
 
   // Updates based on an observed laser scan
   void ObservePointCloud(const std::vector<Eigen::Vector2f>& cloud,
