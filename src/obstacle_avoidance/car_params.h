@@ -52,6 +52,8 @@ const float curvature_increment = 0.02;
 const float num_curves = floor((max_curvature - min_curvature)/curvature_increment) + 1;
 
 const float clearance_factor = car_params::width/2 + car_params::safety_margin + 0.1; // ~6"
+const float clearance_gain = 40.0;
+const float dist_goal_gain = -0.1;
 
 //Latency 
 const uint64_t sys_latency = (.215) * 1e9; // ns
