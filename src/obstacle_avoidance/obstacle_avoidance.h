@@ -164,7 +164,8 @@ void CleanVelocityBuffer(std::vector<navigation::CommandStamped> &v, uint64_t ti
 float GetCurvatureFromGoalPoint(Eigen::Vector2f point);
 
 //Integrates state 
-Eigen::Vector2f Integrate(uint64_t time, std::vector<navigation::CommandStamped> &v, float robot_angle);
+navigation::TimeShiftedTF IntegrateState(navigation::TimeShiftedTF curr_state, navigation::CommandStamped last_cmd, uint64_t timestep);
+double getNewSpeed(double current_velocity, double command_velocity, double timestep);
 
 // Visualization for needed for latency
 void VisualizeLatencyInfo(amrl_msgs::VisualizationMsg &msg, std::vector<Eigen::Vector2f> &point_cloud, Eigen::Vector2f odom_loc, float odom_angle); 
@@ -172,7 +173,7 @@ void VisualizeLatencyInfo(amrl_msgs::VisualizationMsg &msg, std::vector<Eigen::V
 // Outline forward-predicted position of point cloud [blue]
 void LatencyPointCloud(amrl_msgs::VisualizationMsg &msg, std::vector<Eigen::Vector2f>& point_cloud);
 // Outline forward-predicted position of car [blue]
-void LatencyCar(amrl_msgs::VisualizationMsg &msg, Eigen::Vector2f odom_loc, float tht);
-}                    
+void DrawCarLocal(amrl_msgs::VisualizationMsg &msg, Eigen::Vector2f position, float theta);
+} // namespace obstacle_avoidance             
 
 #endif // OBSTACLE_AVOIDANCE_H

@@ -85,7 +85,6 @@ void Navigation::SetNavGoal(const Vector2f& loc, float angle) {
 void Navigation::UpdateLocation(const Eigen::Vector2f& loc, float angle) {
   localization_initialized_ = true;
   robot_loc_ = loc;
-  //std::cout << "    robot location: " << robot_loc_ << "\n";
   robot_angle_ = angle;
 }
 
@@ -100,10 +99,12 @@ void Navigation::UpdateOdometry(const Vector2f& loc,
     odom_start_angle_ = angle;
     odom_start_loc_ = loc;
     odom_initialized_ = true;
+    odom_stamp_ = time - car_params::sensing_latency;
     return;
   }
   odom_loc_ = loc;
   odom_angle_ = angle;
+
   odom_stamp_ = time - car_params::sensing_latency;
   has_new_odom_ = true;
 }
@@ -129,32 +130,17 @@ void Navigation::TimeOptimalControl(const PathOption& path) {
     //TODO: record the commands used for latency compensation
 }
 
-void Navigation::TransformPointCloud(float del_x, float del_y){
-  // std::cout<<"point del: " << del_x << " " << del_y << "\n";
+void Navigation::TransformPointCloud(TimeShiftedTF transform){
+
+  Eigen::Matrix2f R;
+  R << cos(transform.theta), sin(transform.theta), -sin(transform.theta), cos(transform.theta);
+
   for(std::size_t i = 0; i < point_cloud_.size(); i++){
-
-    // Polar to Cartesian conversion, transforms to base link frame
-    //float angle = msg.angle_min + msg.angle_increment*i;
-    float xT = point_cloud_[i][0] - del_x;
-    float yT = point_cloud_[i][1] - del_y;
-    
-    point_cloud_[i] = Vector2f(xT, yT);
+    point_cloud_[i] =  R*(point_cloud_[i] - transform.position);
   }
-
-  //ObservePointCloud(point_cloud_, ros::Time::now().toNSec());
 }
 
-void Navigation::TransformOdom(float del_x, float del_y){
-  //std::cout << "Odom del x and y: " << del_x << " " << del_y << "\n";
-  UpdateOdometry(
-      Vector2f(robot_loc_[0] + del_x, robot_loc_[1] + del_y),
-      odom_angle_,
-      robot_vel_,
-      robot_omega_,
-      ros::Time::now().toNSec());
-}
-
-void Navigation::Run() {
+void Navigation::Run(){
   //This function gets called 20 times a second to form the control loop.
   //Time at begnning of control loop, defined for latency function
   uint64_t start_loop_time = ros::Time::now().toNSec();
@@ -164,105 +150,111 @@ void Navigation::Run() {
   visualization::ClearVisualizationMsg(local_viz_msg_);
   visualization::ClearVisualizationMsg(global_viz_msg_);
 
-    // If odometry has not been initialized, we can't do anything.
+  // If odometry has not been initialized, we can't do anything.
   if (!odom_initialized_) return;
 
+  // std::cout << "Odometry Time: " << odom_stamp_ << std::endl;
+  // std::cout << "Point Cloud Time: " << point_cloud_stamp_ << std::endl;
+  // std::cout << "Actuation Time: " << actuation_time << std::endl << std::endl;
+
+  // std::cout << "Actuation - Odom: " << actuation_time - odom_stamp_ << std::endl;
+  // std::cout << "Actuation - Point Cloud: " << actuation_time - point_cloud_stamp_ << std::endl << std::endl;
+
   //Latency Compensation
-  obstacle_avoidance::CleanVelocityBuffer(vel_commands_, odom_stamp_);
+  
+  obstacle_avoidance::CleanVelocityBuffer(vel_commands_, std::min(odom_stamp_, point_cloud_stamp_));
 
-  float future_odom = robot_vel_.norm()*(vel_commands_[1].stamp - odom_stamp_)*pow(10.0, -9.0); // TF from last odom to future
-  std::cout << "1 "<< future_odom << std::endl;
-  for(std::size_t i = 1; i < vel_commands_.size()-1; i++){
-    future_odom += vel_commands_[i].velocity*(vel_commands_[i+1].stamp - vel_commands_[i].stamp)*pow(10.0, -9.0);
-  }
-  future_odom += vel_commands_.back().velocity*(actuation_time - vel_commands_.back().stamp)*pow(10.0, -9.0);
+  if(has_new_odom_){
+    odom_state_tf.position = Eigen::Vector2f(0, 0);
+    odom_state_tf.speed = robot_vel_[0];
+    odom_state_tf.theta = 0;
+    odom_state_tf.stamp = odom_stamp_;
 
-  std::cout << "2 "<< future_odom << std::endl;
-
-  // Future odom is good!
-
-  //auto odom_to_point_cloud = robot_vel_.norm()*(odom_stamp_ - point_cloud_stamp_)*pow(10.0, -9.0);
-
-  //auto future_point_cloud = future_odom + odom_to_point_cloud;
-
-  //std::cout << future_point_cloud << std::endl;
-
-  //TransformPointCloud(future_point_cloud, 0);
-
-  std::cout << "hasNew Points " << has_new_points_ << std::endl;));
-  If no new sensor data
-  if(!has_new_points_){
-      Eigen::Vector2f points_del = obstacle_avoidance::Integrate(drive_msg_.header.stamp.toNSec(), vel_commands_, robot_angle_);
-      std::cout<< "no points! " << "\n";
-      TransformPointCloud(points_del[0], points_del[1]);
-      obstacle_avoidance::VisualizeLatencyInfo(local_viz_msg_, point_cloud_, points_del, odom_angle_);
+    has_new_odom_ = false;
   }
 
-  if(!has_new_odom_){
-      Eigen::Vector2f points_del = obstacle_avoidance::Integrate(drive_msg_.header.stamp.toNSec(), vel_commands_, robot_angle_);
-      std::cout<< "no odom! " << "\n";
-      TransformPointCloud(points_del[0], points_del[1]);
-      obstacle_avoidance::VisualizeLatencyInfo(local_viz_msg_, point_cloud_, points_del, odom_angle_);
+  // // Find drive cmd after odom msg
+  int cmd_start_index = std::lower_bound(vel_commands_.begin(), vel_commands_.end(), odom_state_tf.stamp) - vel_commands_.begin() - 1;
+  for(std::size_t i = cmd_start_index; i < vel_commands_.size() - 1; i++){
+    odom_state_tf = obstacle_avoidance::IntegrateState(odom_state_tf, vel_commands_[i], vel_commands_[i+1].stamp - odom_state_tf.stamp);
   }
-  If new sensor data
-  if(has_new_points_){
-      std::cout << "New points" << std::endl;
-      Eigen::Vector2f points_del = obstacle_avoidance::Integrate(point_cloud_stamp_, vel_commands_, robot_angle_);
-      TransformPointCloud(points_del[0], points_del[1]);
-      obstacle_avoidance::VisualizeLatencyInfo(local_viz_msg_, point_cloud_, points_del, odom_angle_);
-      has_new_points_ = false;
+  odom_state_tf = obstacle_avoidance::IntegrateState(odom_state_tf, vel_commands_.back(), actuation_time - odom_state_tf.stamp);
+
+  // current state is transform from odom to future
+  // get transform from pc to odom
+
+  uint64_t latest_sensor_msg_stamp;
+  TimeShiftedTF pc_to_odom_transform;
+  pc_to_odom_transform.speed = robot_vel_[0];
+
+  if(point_cloud_stamp_ > odom_stamp_){
+    latest_sensor_msg_stamp = point_cloud_stamp_;
+    pc_to_odom_transform.stamp = odom_stamp_;
+
+  }
+  else{
+    latest_sensor_msg_stamp = odom_stamp_;
+    pc_to_odom_transform.stamp = point_cloud_stamp_;
   }
 
-  if(has_new_odom_){//change to update both x and y pos based on odom.x and odom.y
+  int pc_to_odom_index = 0;
+  while(vel_commands_[pc_to_odom_index+1].stamp < latest_sensor_msg_stamp){
+    pc_to_odom_transform = obstacle_avoidance::IntegrateState(pc_to_odom_transform, vel_commands_[pc_to_odom_index], vel_commands_[pc_to_odom_index+1].stamp - pc_to_odom_transform.stamp);
+    pc_to_odom_index++;
+  }
+  pc_to_odom_transform = obstacle_avoidance::IntegrateState(pc_to_odom_transform, vel_commands_[pc_to_odom_index], latest_sensor_msg_stamp - pc_to_odom_transform.stamp);
 
-      Eigen::Vector2f odom_del = obstacle_avoidance::Integrate(odom_stamp_, vel_commands_, robot_angle_);;
-      TransformOdom(odom_del[0], odom_del[1]);
-      std::cout << "Odom Loc: " << odom_loc_ << "\n"; 
-      obstacle_avoidance::VisualizeLatencyInfo(local_viz_msg_, point_cloud_, odom_del, odom_angle_);
-      has_new_odom_ = false;
+  if(point_cloud_stamp_ > odom_stamp_){
+    pc_to_odom_transform.theta = odom_state_tf.theta - pc_to_odom_transform.theta;
+    pc_to_odom_transform.position = odom_state_tf.position - pc_to_odom_transform.position;
+  }
+  else{
+    pc_to_odom_transform.theta += odom_state_tf.theta;
+    pc_to_odom_transform.position += odom_state_tf.position;
   }
 
+  TransformPointCloud(pc_to_odom_transform);
 
 
-    Eigen::Vector2f goal_point(4, 0.0);
+  obstacle_avoidance::LatencyPointCloud(local_viz_msg_, point_cloud_);
+  obstacle_avoidance::DrawCarLocal(local_viz_msg_, odom_state_tf.position, odom_state_tf.theta);
 
-    float goal_curvature = obstacle_avoidance::GetCurvatureFromGoalPoint(goal_point);
-    goal_curvature = Clamp(goal_curvature, car_params::min_curvature, car_params::max_curvature);
+  Eigen::Vector2f goal_point(4, 0.0);
+
+  float goal_curvature = obstacle_avoidance::GetCurvatureFromGoalPoint(goal_point);
+  goal_curvature = Clamp(goal_curvature, car_params::min_curvature, car_params::max_curvature);
 
   // 4) Generate range of possible paths centered on goal_curvature, using std::vector<struct PathOption>(MAXX)
 
-    static std::vector<struct PathOption> path_options(car_params::num_curves);
+  static std::vector<struct PathOption> path_options(car_params::num_curves);
 
   // 6) For possible paths and point_cloud:
   //auto start_time = ros::Time::now().toSec();
-    for(std::size_t curve_index = 0; curve_index < path_options.size(); curve_index++){
-      float curvature = obstacle_avoidance::GetCurvatureOptionFromRange(curve_index, goal_curvature, car_params::min_curvature, car_params::curvature_increment);
-      
-      // Initialize path_option and collision bounds for curvature
-      obstacle_avoidance::PathBoundaries collision_bounds(abs(curvature));
-      path_options[curve_index] = navigation::PathOption{
-        curvature,                    // curvature
-        10,                           // default clearance
-        car_params::max_path_length,  // free Path Length
-        Eigen::Vector2f(0, 0),        // obstacle point
-        Eigen::Vector2f(0, 0)};       // closest point
+  for(std::size_t curve_index = 0; curve_index < path_options.size(); curve_index++){
+    float curvature = obstacle_avoidance::GetCurvatureOptionFromRange(curve_index, goal_curvature, car_params::min_curvature, car_params::curvature_increment);
+    
+    // Initialize path_option and collision bounds for curvature
+    obstacle_avoidance::PathBoundaries collision_bounds(abs(curvature));
+    path_options[curve_index] = navigation::PathOption{
+      curvature,                    // curvature
+      10,                           // default clearance
+      car_params::max_path_length,  // free Path Length
+      Eigen::Vector2f(0, 0),        // obstacle point
+      Eigen::Vector2f(0, 0)};       // closest point
 
-      obstacle_avoidance::EvaluatePathWithPointCloud(path_options[curve_index], collision_bounds, point_cloud_);
-      //    - Get Distance to Goal (YUHONG, look at math functions)
-      obstacle_avoidance::LimitFreePath(path_options[curve_index], goal_point);
-      obstacle_avoidance::EvaluateClearanceWithPointCloud(path_options[curve_index], collision_bounds, point_cloud_);
+    obstacle_avoidance::EvaluatePathWithPointCloud(path_options[curve_index], collision_bounds, point_cloud_);
+    //    - Get Distance to Goal (YUHONG, look at math functions)
+    obstacle_avoidance::LimitFreePath(path_options[curve_index], goal_point);
+    obstacle_avoidance::EvaluateClearanceWithPointCloud(path_options[curve_index], collision_bounds, point_cloud_);
 
-      //std::cout << path_options[curve_index].clearance << std::endl;
-      // Visualization test code
-      
-      // visualization::DrawPathOption(path_options[curve_index].curvature, path_options[curve_index].free_path_length, path_options[curve_index].clearance, local_viz_msg_);
-      // visualization::DrawCross(path_options[curve_index].obstruction, 0.1,  0x0046FF, local_viz_msg_);
-    }
+    // Visualization test code
+    // visualization::DrawPathOption(path_options[curve_index].curvature, path_options[curve_index].free_path_length, path_options[curve_index].clearance, local_viz_msg_);
+    // visualization::DrawCross(path_options[curve_index].obstruction, 0.1,  0x0046FF, local_viz_msg_);
+  }
   //auto end_time = ros::Time::now().toSec();
   //std::cout << end_time - start_time << std::endl;
   // 7) Select best path from scoring function (Easy, YUHONG)
   struct PathOption best_path = obstacle_avoidance::ChooseBestPath(path_options,goal_point);
-
 
   //std::cout << "Length, Clearance, Dist: " << best_path.free_path_length << ", " << 2.5 * best_path.clearance << ", " << -0.1 * obstacle_avoidance::GetDistanceToGoal(best_path,goal_point) << std::endl;
   
@@ -273,9 +265,8 @@ void Navigation::Run() {
   // Add timestamps to all messages.
   local_viz_msg_.header.stamp = ros::Time::now();
   global_viz_msg_.header.stamp = ros::Time::now();
-  drive_msg_.header.stamp = ros::Time::now();
 
-  CommandStamped drive_cmd(drive_msg_.velocity, drive_msg_.curvature, drive_msg_.header.stamp.toNSec() + car_params::sys_latency);
+  CommandStamped drive_cmd(drive_msg_.velocity, drive_msg_.curvature, drive_msg_.header.stamp.toNSec() + car_params::actuation_latency);
   vel_commands_.push_back(drive_cmd);
 
   //uint64_t last_loop_time = ros::Time::now().toNSec() - start_loop_time;

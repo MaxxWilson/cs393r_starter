@@ -33,6 +33,8 @@ const float track_width = 0.235; // 9.25
 const float safety_margin = 0.025; // 2"
 
 const float dist_to_front_bumper = (length + wheel_base)/2 + safety_margin;
+const float dist_to_side_bumper = width/2 + safety_margin;
+const float dist_to_rear_bumper = (length-wheel_base)/2;
 
 const float max_curvature = 1.0; // +-0.75
 const float min_curvature = -1.0;
@@ -52,9 +54,9 @@ const float num_curves = floor((max_curvature - min_curvature)/curvature_increme
 const float clearance_factor = car_params::width/2 + car_params::safety_margin + 0.1; // ~6"
 
 //Latency 
-const float sys_latency = (.215) * pow(10, 9); //(ns)
-const float sensing_latency =  sys_latency/4;
-const float actuation_latency = 3*sys_latency/4;
+const uint64_t sys_latency = (.215) * 1e9; // ns
+const uint64_t sensing_latency =  sys_latency/4;
+const uint64_t actuation_latency = 3*sys_latency/4;
 
 }
 

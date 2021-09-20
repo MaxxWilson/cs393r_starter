@@ -33,7 +33,7 @@
 
 
 // line arguments used in obstacle avoidance function
-DEFINE_double(clearance_param,3.0,"clearance parameter used in scoring function");
+DEFINE_double(clearance_param, 40.0,"clearance parameter used in scoring function");
 DEFINE_double(distance_goal_param,-0.1,"distance to goal parameter used in scoring function");
 
 using namespace math_util;
@@ -327,27 +327,58 @@ Eigen::Vector2f Integrate(uint64_t stamp, std::vector<navigation::CommandStamped
 
 
 // Outline forward-predicted position of car [blue]
-// odom_del is literally so small that latency car does not show up on sim. Overlaps with real car
-void LatencyCar(amrl_msgs::VisualizationMsg &msg, Eigen::Vector2f odom_del, float tht){
-    //std::cout<<"    odom_del" << odom_del << "\n";
-    Eigen::Vector2f front_left((car_params::wheel_base+car_params::length)/2 + odom_del[0] / cos(tht), (car_params::width + odom_del[1])/(2  * sin(tht)));
-    Eigen::Vector2f front_right((car_params::wheel_base+car_params::length)/2 + odom_del[0] / cos(tht), (-car_params::width + odom_del[1])/(2  * sin(tht)));
-    Eigen::Vector2f back_left(-(car_params::length-car_params::wheel_base)/2  + odom_del[0] / cos(tht), (car_params::width  + odom_del[1])/(2 * sin(tht)));
-    Eigen::Vector2f back_right(-(car_params::length-car_params::wheel_base)/2  + odom_del[0] / cos(tht) ,(-car_params::width  + odom_del[1])/(2  * sin(tht)));
-    //car front
-    visualization::DrawLine(front_left, front_right,0x1e9aa8,msg);
-    //car back
-    visualization::DrawLine(back_left , back_right,0x1e9aa8,msg);
-    //car left
-    visualization::DrawLine(front_left, back_left,0x1e9aa8,msg);
-    //car right
-    visualization::DrawLine(front_right,back_right,0x1e9aa8,msg);
-    visualization::DrawLine(front_right, back_left  ,0x1e9aa8,msg);
+void DrawCarLocal(amrl_msgs::VisualizationMsg &msg, Eigen::Vector2f position, float theta){
+
+    float fwd = car_params::dist_to_front_bumper;
+    float side = car_params::dist_to_side_bumper;
+    float rear = car_params::dist_to_rear_bumper;
+    uint32_t color = 0x1e9aa8;
+
+    Eigen::Vector2f front_left = position + Eigen::Vector2f(-side*sin(theta) + fwd*cos(theta), side*cos(theta) + fwd*sin(theta));
+    Eigen::Vector2f front_right = position + Eigen::Vector2f(side*sin(theta) + fwd*cos(theta), -side*cos(theta) + fwd*sin(theta));
+    Eigen::Vector2f back_left = position + Eigen::Vector2f(-side*sin(theta) - rear*cos(theta), -rear*sin(theta) + side*cos(theta));
+    Eigen::Vector2f back_right = position + Eigen::Vector2f(side*sin(theta) - rear*cos(theta), -rear*sin(theta) - side*cos(theta));
+
+    visualization::DrawLine(front_left, front_right, color, msg); // front
+    visualization::DrawLine(back_left, back_right, color, msg); // back
+    visualization::DrawLine(front_left, back_left, color, msg); // left
+    visualization::DrawLine(front_right, back_right, color, msg); // right
+    visualization::DrawLine(front_right, back_left, color,msg);
+}
+
+navigation::TimeShiftedTF IntegrateState(navigation::TimeShiftedTF curr_state, navigation::CommandStamped last_cmd, uint64_t timestep){
+    navigation::TimeShiftedTF next_state;
+
+    double dt = ((double) timestep) / 1e9;
+
+    next_state.stamp = curr_state.stamp + timestep;
+    next_state.speed = getNewSpeed(curr_state.speed, last_cmd.velocity, dt);
+    next_state.theta = curr_state.theta + curr_state.speed * last_cmd.curvature * dt;
+
+    if(last_cmd.curvature == 0){
+        next_state.position = curr_state.position + Eigen::Vector2f(curr_state.speed * dt, 0);
+    }
+    else{
+        next_state.position = curr_state.position + Eigen::Vector2f(
+            sin(curr_state.speed * last_cmd.curvature * dt)/last_cmd.curvature,
+            (1-cos(curr_state.speed * last_cmd.curvature * dt))/last_cmd.curvature);
+    }
+    return next_state;
+}
+
+double getNewSpeed(double current_velocity, double command_velocity, double timestep){
+    float accel = (command_velocity >= current_velocity) ? car_params::max_acceleration : car_params::min_acceleration;
+    if(Sign(accel) == 1){ // accelerating
+        return std::min(current_velocity + accel*timestep, command_velocity);
+    }
+    else{ // deccelerating
+        return std::max(current_velocity + accel*timestep, command_velocity);
+    }
 
 }
 
 // Outline forward-predicted position of point cloud [blue]
-void LatencyPointCloud(amrl_msgs::VisualizationMsg &msg, std::vector<Eigen::Vector2f>& point_cloud){
+void LatencyPointCloud(amrl_msgs::VisualizationMsg &msg, std::vector<Eigen::Vector2f> &point_cloud){
   for(std::size_t i = 0; i < point_cloud.size(); i++){
     visualization::DrawPoint(point_cloud[i], 0x1e9aa8, msg);
   }
@@ -355,7 +386,7 @@ void LatencyPointCloud(amrl_msgs::VisualizationMsg &msg, std::vector<Eigen::Vect
 
 // Visualization for needed for latency
 void VisualizeLatencyInfo(amrl_msgs::VisualizationMsg &msg, std::vector<Eigen::Vector2f> &point_cloud, Eigen::Vector2f odom_loc, float odom_angle){
-    LatencyCar(msg, odom_loc, odom_angle);
+    DrawCarLocal(msg, odom_loc, odom_angle);
     LatencyPointCloud(msg, point_cloud);
 }
 } //namespace obstacle_avoidance

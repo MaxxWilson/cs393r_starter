@@ -43,8 +43,8 @@ struct PathOption {
 };
 
 struct CommandStamped{
-  float velocity = 0.0;
-  float curvature = 0.0;
+  double velocity = 0.0;
+  double curvature = 0.0;
   uint64_t stamp = 0.0;
 
   CommandStamped(){};
@@ -59,6 +59,13 @@ struct CommandStamped{
   {
     return this->stamp < time_compare;
   }
+};
+
+struct TimeShiftedTF{
+  Eigen::Vector2f position = Eigen::Vector2f(0, 0);
+  double theta = 0.0;
+  double speed = 0.0;
+  uint64_t stamp = 0;
 };
 
 class Navigation {
@@ -89,10 +96,6 @@ class Navigation {
   // Use time optimal strategy to control the car
   void TimeOptimalControl(const PathOption& path);
 
-  void TransformPointCloud(float del_x, float del_y);
-
-  void TransformOdom(float del_x, float del_y);
-
   std::vector<CommandStamped> vel_commands_;
 
  private:
@@ -117,10 +120,13 @@ class Navigation {
   Eigen::Vector2f odom_start_loc_;
   // Odometry-reported robot starting angle.
   float odom_start_angle_;
+
   // Last odometry timestamp
   uint64_t odom_stamp_;
   //Updates if odometry has new data
   bool has_new_odom_;
+
+  TimeShiftedTF odom_state_tf;
 
   // Latest observed point cloud.
   std::vector<Eigen::Vector2f> point_cloud_;
@@ -135,6 +141,8 @@ class Navigation {
   Eigen::Vector2f nav_goal_loc_;
   // Navigation goal angle.
   float nav_goal_angle_;
+
+  void TransformPointCloud(TimeShiftedTF transform);
 };
 
 }  // namespace navigation
