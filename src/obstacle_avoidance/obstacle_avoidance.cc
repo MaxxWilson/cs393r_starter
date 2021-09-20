@@ -25,6 +25,7 @@
 
 #include "obstacle_avoidance/obstacle_avoidance.h"
 
+
 #include <float.h>
 #include "shared/math/line2d.h"
 
@@ -32,10 +33,11 @@
 
 
 // line arguments used in obstacle avoidance function
-DEFINE_double(clearance_param,3.0,"clearance parameter used in scoring function");
+DEFINE_double(clearance_param, 40.0,"clearance parameter used in scoring function");
 DEFINE_double(distance_goal_param,-0.1,"distance to goal parameter used in scoring function");
 
 using namespace math_util;
+
 namespace obstacle_avoidance{
 
 bool IsPointCollisionPossible(float curvature, const Eigen::Vector2f &point){
@@ -303,4 +305,89 @@ void SelectedPathOutliner(const navigation::PathOption& selected_path,amrl_msgs:
 void GoalOutliner(Eigen::Vector2f& goal, amrl_msgs::VisualizationMsg& msg){
     visualization::DrawCross(goal,0.5,0xfc4103,msg);
 }
-} // namespace obstacle_avoidance
+
+//Cleans when updated time variable is passed in
+void CleanVelocityBuffer(std::vector<navigation::CommandStamped> &v, uint64_t time){
+  auto it = std::lower_bound(v.begin(), v.end(), time);
+  v.erase(v.begin(), it-1);
+}
+
+//Integrates from one time stamp to the next
+//Returns float &point_cloud_stamp_ failed linker????
+Eigen::Vector2f Integrate(uint64_t stamp, std::vector<navigation::CommandStamped> &v, float angle){
+    int it = std::lower_bound(v.begin(), v.end(), stamp) - v.begin(); // Index of command before pc
+    //std::cout << v[it].velocity << std::endl;
+    // std::cout << "    stamp: " <<  stamp << "\n";
+    // std::cout << "    ros::Time::now(): " <<  ros::Time::now().toNSec() << "\n";
+    // std::cout << "    del_t(ns): " << ros::Time::now().toNSec() -  stamp << "\n";
+    float del_x = (v[it].velocity * cos(angle)) * pow(10.0, -9.0) * (car_params::sys_latency);//sys_latency in ns
+    float del_y = (v[it].velocity) * sin(angle) * pow(10.0, -9.0) * (car_params::sys_latency);
+    return Eigen::Vector2f(del_x, del_y);
+}
+
+
+// Outline forward-predicted position of car [blue]
+void DrawCarLocal(amrl_msgs::VisualizationMsg &msg, Eigen::Vector2f position, float theta){
+
+    float fwd = car_params::dist_to_front_bumper;
+    float side = car_params::dist_to_side_bumper;
+    float rear = car_params::dist_to_rear_bumper;
+    uint32_t color = 0x1e9aa8;
+
+    Eigen::Vector2f front_left = position + Eigen::Vector2f(-side*sin(theta) + fwd*cos(theta), side*cos(theta) + fwd*sin(theta));
+    Eigen::Vector2f front_right = position + Eigen::Vector2f(side*sin(theta) + fwd*cos(theta), -side*cos(theta) + fwd*sin(theta));
+    Eigen::Vector2f back_left = position + Eigen::Vector2f(-side*sin(theta) - rear*cos(theta), -rear*sin(theta) + side*cos(theta));
+    Eigen::Vector2f back_right = position + Eigen::Vector2f(side*sin(theta) - rear*cos(theta), -rear*sin(theta) - side*cos(theta));
+
+    visualization::DrawLine(front_left, front_right, color, msg); // front
+    visualization::DrawLine(back_left, back_right, color, msg); // back
+    visualization::DrawLine(front_left, back_left, color, msg); // left
+    visualization::DrawLine(front_right, back_right, color, msg); // right
+    visualization::DrawLine(front_right, back_left, color,msg);
+}
+
+navigation::TimeShiftedTF IntegrateState(navigation::TimeShiftedTF curr_state, navigation::CommandStamped last_cmd, uint64_t timestep){
+    navigation::TimeShiftedTF next_state;
+
+    double dt = ((double) timestep) / 1e9;
+
+    next_state.stamp = curr_state.stamp + timestep;
+    next_state.speed = getNewSpeed(curr_state.speed, last_cmd.velocity, dt);
+    next_state.theta = curr_state.theta + curr_state.speed * last_cmd.curvature * dt;
+
+    if(last_cmd.curvature == 0){
+        next_state.position = curr_state.position + Eigen::Vector2f(curr_state.speed * dt, 0);
+    }
+    else{
+        next_state.position = curr_state.position + Eigen::Vector2f(
+            sin(curr_state.speed * last_cmd.curvature * dt)/last_cmd.curvature,
+            (1-cos(curr_state.speed * last_cmd.curvature * dt))/last_cmd.curvature);
+    }
+    return next_state;
+}
+
+double getNewSpeed(double current_velocity, double command_velocity, double timestep){
+    float accel = (command_velocity >= current_velocity) ? car_params::max_acceleration : car_params::min_acceleration;
+    if(Sign(accel) == 1){ // accelerating
+        return std::min(current_velocity + accel*timestep, command_velocity);
+    }
+    else{ // deccelerating
+        return std::max(current_velocity + accel*timestep, command_velocity);
+    }
+
+}
+
+// Outline forward-predicted position of point cloud [blue]
+void LatencyPointCloud(amrl_msgs::VisualizationMsg &msg, std::vector<Eigen::Vector2f> &point_cloud){
+  for(std::size_t i = 0; i < point_cloud.size(); i++){
+    visualization::DrawPoint(point_cloud[i], 0x1e9aa8, msg);
+  }
+}
+
+// Visualization for needed for latency
+void VisualizeLatencyInfo(amrl_msgs::VisualizationMsg &msg, std::vector<Eigen::Vector2f> &point_cloud, Eigen::Vector2f odom_loc, float odom_angle){
+    DrawCarLocal(msg, odom_loc, odom_angle);
+    LatencyPointCloud(msg, point_cloud);
+}
+} //namespace obstacle_avoidance
+

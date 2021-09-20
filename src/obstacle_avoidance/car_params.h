@@ -33,6 +33,8 @@ const float track_width = 0.235; // 9.25
 const float safety_margin = 0.025; // 2"
 
 const float dist_to_front_bumper = (length + wheel_base)/2 + safety_margin;
+const float dist_to_side_bumper = width/2 + safety_margin;
+const float dist_to_rear_bumper = (length-wheel_base)/2;
 
 const float max_curvature = 1.0; // +-0.75
 const float min_curvature = -1.0;
@@ -40,14 +42,22 @@ const float min_curvature = -1.0;
 // Dynamics
 const float max_acceleration = 4.0; //1.865;
 const float min_acceleration = -4.0; //-1.171;
-const float max_velocity = 0.4;
+const float max_velocity = 1.0;
+
 
 // Algorithmic Parameters
 const float safe_distance = 0.05; // safe distance used in TOC control, stops with 5" left to obstacle
 const float max_path_length = 7.0;
 const float curvature_increment = 0.02;
 const float num_curves = floor((max_curvature - min_curvature)/curvature_increment) + 1;
+
 const float clearance_factor = car_params::width/2 + car_params::safety_margin + 0.1; // ~6"
+
+//Latency 
+const uint64_t sys_latency = (.215) * 1e9; // ns
+const uint64_t sensing_latency =  sys_latency/4;
+const uint64_t actuation_latency = 3*sys_latency/4;
+
 }
 
 #endif // CAR_PARAMS_H
