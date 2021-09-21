@@ -84,7 +84,7 @@ void LaserCallback(const sensor_msgs::LaserScan& msg) {
   // Location of the laser on the robot. Assumes the laser is forward-facing.
   const Vector2f kLaserLoc(0.2, 0);
 
-  static vector<Vector2f> point_cloud_(msg.ranges.size());
+  static vector<Vector2f> cloud(msg.ranges.size());
   
   for(std::size_t i = 0; i < msg.ranges.size(); i++){
 
@@ -93,15 +93,15 @@ void LaserCallback(const sensor_msgs::LaserScan& msg) {
     float x = msg.ranges[i]*cos(angle) + kLaserLoc[0];
     float y = msg.ranges[i]*sin(angle) + kLaserLoc[1];
     
-    point_cloud_[i] = Vector2f(x, y);
+    cloud[i] = Vector2f(x, y);
   }
 
-  navigation_->ObservePointCloud(point_cloud_, msg.header.stamp.toNSec());
+  navigation_->ObservePointCloud(cloud, msg.header.stamp.toNSec());
   last_laser_msg_ = msg;
 }
 
 void OdometryCallback(const nav_msgs::Odometry& msg) {
- // msg.header.stamp = ros::Time::now();
+  //msg.header.stamp = ros::Time::now();
   if (FLAGS_v > 0) {
     printf("Odometry t=%f\n", msg.header.stamp.toSec());
   }
@@ -112,7 +112,7 @@ void OdometryCallback(const nav_msgs::Odometry& msg) {
       2.0 * atan2(msg.pose.pose.orientation.z, msg.pose.pose.orientation.w),
       Vector2f(msg.twist.twist.linear.x, msg.twist.twist.linear.y),
       msg.twist.twist.angular.z,
-      msg.header.stamp.toNSec());
+      ros::Time::now().toNSec());
 }
 
 void GoToCallback(const geometry_msgs::PoseStamped& msg) {

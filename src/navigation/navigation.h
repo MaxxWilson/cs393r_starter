@@ -123,6 +123,7 @@ class Navigation {
 
   // Last odometry timestamp
   uint64_t odom_stamp_;
+  uint64_t last_odom_stamp_ = 0;
   //Updates if odometry has new data
   bool has_new_odom_;
 
@@ -130,6 +131,8 @@ class Navigation {
 
   // Latest observed point cloud.
   std::vector<Eigen::Vector2f> point_cloud_;
+  std::vector<Eigen::Vector2f> transformed_point_cloud_;
+
   //Point cloud timestamp
   uint64_t point_cloud_stamp_;
   //True if point cloud is updated
@@ -141,6 +144,8 @@ class Navigation {
   Eigen::Vector2f nav_goal_loc_;
   // Navigation goal angle.
   float nav_goal_angle_;
+
+  uint64_t end_time = 0;
 
   void TransformPointCloud(TimeShiftedTF transform);
 };

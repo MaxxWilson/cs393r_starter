@@ -105,7 +105,11 @@ void Navigation::UpdateOdometry(const Vector2f& loc,
   odom_loc_ = loc;
   odom_angle_ = angle;
 
+  //std::cout << "omega, vel, loc, angle: " << ang_vel << ", " << robot_vel_[0] << ", " << loc << ", " << angle << std::endl;
+
   odom_stamp_ = time - car_params::sensing_latency;
+  last_odom_stamp_ = odom_stamp_;
+  //std::cout << "odom stamp: " << odom_stamp_ << std::endl;
   has_new_odom_ = true;
 }
 
@@ -118,14 +122,21 @@ void Navigation::ObservePointCloud(const vector<Vector2f>& cloud,
 
 //Solve the TOC Problem
 void Navigation::TimeOptimalControl(const PathOption& path) {
-    double current_speed = robot_vel_.norm();
+    double current_speed = odom_state_tf.speed;
     double min_stop_distance = car_params::safe_distance-0.5*current_speed*current_speed/car_params::min_acceleration; //calculate the minimum stopping distance at current velocity
     double set_speed = (path.free_path_length>min_stop_distance)?car_params::max_velocity:0; //decelerate if free path is is smaller than minimum stopping distance otherwise accelerate
+    
+    //std::cout << "free path: " << path.free_path_length << std::endl;
+    //std::cout << "min stop: " << min_stop_distance << std::endl;
+    
     //publish command to topic 
     drive_msg_.header.seq++;
     drive_msg_.header.stamp = ros::Time::now();
     drive_msg_.curvature = path.curvature;
     drive_msg_.velocity = set_speed;
+
+    std::cout << path.free_path_length << std::endl;
+
     drive_pub_.publish(drive_msg_);
     //TODO: record the commands used for latency compensation
 }
@@ -135,8 +146,10 @@ void Navigation::TransformPointCloud(TimeShiftedTF transform){
   Eigen::Matrix2f R;
   R << cos(transform.theta), sin(transform.theta), -sin(transform.theta), cos(transform.theta);
 
+  transformed_point_cloud_.resize(point_cloud_.size());
+
   for(std::size_t i = 0; i < point_cloud_.size(); i++){
-    point_cloud_[i] =  R*(point_cloud_[i] - transform.position);
+    transformed_point_cloud_[i] =  R*(point_cloud_[i] - transform.position);
   }
 }
 
@@ -144,7 +157,9 @@ void Navigation::Run(){
   //This function gets called 20 times a second to form the control loop.
   //Time at begnning of control loop, defined for latency function
   uint64_t start_loop_time = ros::Time::now().toNSec();
-  uint64_t actuation_time = start_loop_time + car_params::sys_latency; // TODO + EXEC TIME
+  uint64_t actuation_time = start_loop_time + car_params::actuation_latency;
+
+  //std::cout << "Latency?: " << ((double) (start_loop_time - end_time)) * 1e-9 << std::endl;
   
   // Clear previous visualizations.
   visualization::ClearVisualizationMsg(local_viz_msg_);
@@ -176,6 +191,7 @@ void Navigation::Run(){
   // // Find drive cmd after odom msg
   int cmd_start_index = std::lower_bound(vel_commands_.begin(), vel_commands_.end(), odom_state_tf.stamp) - vel_commands_.begin() - 1;
   for(std::size_t i = cmd_start_index; i < vel_commands_.size() - 1; i++){
+    //std::cout << i << ": " << vel_commands_[i].velocity << std::endl;
     odom_state_tf = obstacle_avoidance::IntegrateState(odom_state_tf, vel_commands_[i], vel_commands_[i+1].stamp - odom_state_tf.stamp);
   }
   odom_state_tf = obstacle_avoidance::IntegrateState(odom_state_tf, vel_commands_.back(), actuation_time - odom_state_tf.stamp);
@@ -190,7 +206,6 @@ void Navigation::Run(){
   if(point_cloud_stamp_ > odom_stamp_){
     latest_sensor_msg_stamp = point_cloud_stamp_;
     pc_to_odom_transform.stamp = odom_stamp_;
-
   }
   else{
     latest_sensor_msg_stamp = odom_stamp_;
@@ -213,10 +228,14 @@ void Navigation::Run(){
     pc_to_odom_transform.position += odom_state_tf.position;
   }
 
+  //std::cout << "Odom State: " << odom_state_tf.speed << "\t" << odom_state_tf.position[0] << ", " << odom_state_tf.position[1] << std::endl;
+
   TransformPointCloud(pc_to_odom_transform);
 
+  //std::cout << pc_to_odom_transform.position[0] << ", " << pc_to_odom_transform.position[1] << std::endl;
 
-  obstacle_avoidance::LatencyPointCloud(local_viz_msg_, point_cloud_);
+
+  obstacle_avoidance::LatencyPointCloud(local_viz_msg_, transformed_point_cloud_);
   obstacle_avoidance::DrawCarLocal(local_viz_msg_, odom_state_tf.position, odom_state_tf.theta);
 
   Eigen::Vector2f goal_point(4, 0.0);
@@ -242,17 +261,15 @@ void Navigation::Run(){
       Eigen::Vector2f(0, 0),        // obstacle point
       Eigen::Vector2f(0, 0)};       // closest point
 
-    obstacle_avoidance::EvaluatePathWithPointCloud(path_options[curve_index], collision_bounds, point_cloud_);
+    obstacle_avoidance::EvaluatePathWithPointCloud(path_options[curve_index], collision_bounds, transformed_point_cloud_);
     //    - Get Distance to Goal (YUHONG, look at math functions)
     obstacle_avoidance::LimitFreePath(path_options[curve_index], goal_point);
-    obstacle_avoidance::EvaluateClearanceWithPointCloud(path_options[curve_index], collision_bounds, point_cloud_);
+    obstacle_avoidance::EvaluateClearanceWithPointCloud(path_options[curve_index], collision_bounds, transformed_point_cloud_);
 
     // Visualization test code
     // visualization::DrawPathOption(path_options[curve_index].curvature, path_options[curve_index].free_path_length, path_options[curve_index].clearance, local_viz_msg_);
     // visualization::DrawCross(path_options[curve_index].obstruction, 0.1,  0x0046FF, local_viz_msg_);
   }
-  //auto end_time = ros::Time::now().toSec();
-  //std::cout << end_time - start_time << std::endl;
   // 7) Select best path from scoring function (Easy, YUHONG)
   struct PathOption best_path = obstacle_avoidance::ChooseBestPath(path_options,goal_point);
 
@@ -266,6 +283,8 @@ void Navigation::Run(){
   local_viz_msg_.header.stamp = ros::Time::now();
   global_viz_msg_.header.stamp = ros::Time::now();
 
+  //std::cout << drive_msg_.velocity << std::endl;
+
   CommandStamped drive_cmd(drive_msg_.velocity, drive_msg_.curvature, drive_msg_.header.stamp.toNSec() + car_params::actuation_latency);
   vel_commands_.push_back(drive_cmd);
 
@@ -277,6 +296,9 @@ void Navigation::Run(){
   //Time at end of control loop, defined for latency function
   // ros::Time t_end_control_function = ros::Time::now();
 
+  //std::cout << "Loop Time" << ((double) (ros::Time::now().toNSec() - start_loop_time)) * 1e-9 << std::endl;
+
+    end_time = ros::Time::now().toNSec();
 }
 
 }  // namespace navigation
