@@ -137,15 +137,13 @@ class Navigation {
   uint64_t point_cloud_stamp_;
   //True if point cloud is updated
   bool has_new_points_;
-  // Whether navigation is complete.
 
+  // Whether navigation is complete.
   bool nav_complete_;
   // Navigation goal location.
   Eigen::Vector2f nav_goal_loc_;
   // Navigation goal angle.
   float nav_goal_angle_;
-
-  uint64_t end_time = 0;
 
   void TransformPointCloud(TimeShiftedTF transform);
 };

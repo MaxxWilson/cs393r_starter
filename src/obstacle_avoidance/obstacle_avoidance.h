@@ -31,6 +31,12 @@
 #define OBSTACLE_AVOIDANCE_H
 
 namespace obstacle_avoidance{
+
+/**
+ * struct to contain the radii which define different collision zones.
+ * 
+ * While not required by the structure, the curvature values used are always positive for our use.
+ */
 struct PathBoundaries{
     float curvature = 0.0;
     float min_radius = 0.0;
@@ -54,9 +60,6 @@ struct PathBoundaries{
     }
 };
 
-// temporary
-double GetDistanceToGoal(const navigation::PathOption& path,const Eigen::Vector2f& goal);
-
 /**
  * Implements computationally cheap methods to rule out certain points, saving more expensive searches
  * Includes skipping points behind the car, points that the car will turn away from, and points outside the search radius.
@@ -77,7 +80,6 @@ bool IsPointCollisionPossible(float curvature, const Eigen::Vector2f &point);
  */
 void EvaluatePathWithPointCloud(navigation::PathOption &path_option, const PathBoundaries &collision_bounds, const std::vector<Eigen::Vector2f> &point_cloud_);
 
-
 /**
  * Evaluates path with specific point, checking for collision, clearance, and distance to goal.
  * 
@@ -94,8 +96,6 @@ navigation::PathOption EvaluatePathWithPoint(const PathBoundaries &collision_bou
  * @returns curvature of the arc that passes through target point
  */
 float GetCurvatureFromGoalPoint(Eigen::Vector2f point);
-
-
 
 /**
  * For Side Collision, calculate Free Path Length to obstacle.
@@ -145,34 +145,81 @@ void LimitFreePath(navigation::PathOption& path,const Eigen::Vector2f& goal);
 struct navigation::PathOption ChooseBestPath(std::vector<navigation::PathOption>& paths, const Eigen::Vector2f& goal);
 void EvaluateClearanceWithPointCloud(navigation::PathOption &path_option, const PathBoundaries &collision_bounds, const std::vector<Eigen::Vector2f> &point_cloud_);
 float EvaluateClearanceWithPoint(const PathBoundaries &collision_bounds, const navigation::PathOption &path_option, Eigen::Vector2f point);
-// visualization functions
-// call the other visualization functions to visualize all the information needed for obstacle avoidance
+
+// Visualization functions //
+/**
+ * Call the other visualization functions to visualize all the information needed for obstacle avoidance
+ * 
+ * @param goal 2D goal point in car frame
+ * @param paths vector of possible path options
+ * @param selected_path final path selected by scoring function
+ * @param msg visualization msg to draw (local)
+ */
 void VisualizeObstacleAvoidanceInfo(Eigen::Vector2f& goal,
                            std::vector<navigation::PathOption>& paths,
                            const navigation::PathOption& selected_path,
                            amrl_msgs::VisualizationMsg &msg);
+                           
 void CarOutliner(amrl_msgs::VisualizationMsg& msg);
 void PossiblePathsOutliner(const std::vector<navigation::PathOption>& paths,amrl_msgs::VisualizationMsg& msg);
 void SelectedPathOutliner(const navigation::PathOption& selected_path,amrl_msgs::VisualizationMsg& msg);
 void GoalOutliner(Eigen::Vector2f& goal, amrl_msgs::VisualizationMsg& msg);
 
-void EvaluatePathLength(struct navigation::PathOption path, std::vector<Eigen::Vector2f> point_cloud);
-
+/**
+ * Clears values from the velocity command buffer up to to the value before timestamp
+ * 
+ * @param v vector of previous vehicle commands
+ * @param time timestamp in nano seconds, prior to which commands should be cleared
+ */
 void CleanVelocityBuffer(std::vector<navigation::CommandStamped> &v, uint64_t time);
 
-// Given a goal point in base_link frame, return a curvature path that intersects the point
+/**
+ * Given a goal point in base_link frame, return a curvature path that intersects the point
+ * 
+ * @param point 2D Point representing immediate target
+ */
 float GetCurvatureFromGoalPoint(Eigen::Vector2f point);
 
-//Integrates state 
+/**
+ * Function to integrate the vehicle's state forward in time given the previous curvature and velocity commands.
+ * 
+ * @param curr_state contains current estimate of vehicle position, velocity, angle
+ * @param last_cmd contains previous command issues to car
+ * @param timestep timestep in nanoseconds
+ * 
+ * @returns Time shifted transform representing the new robot state/transform between previous and next states.
+ */
 navigation::TimeShiftedTF IntegrateState(navigation::TimeShiftedTF curr_state, navigation::CommandStamped last_cmd, uint64_t timestep);
+
+/**
+ * Models vehicle dynamics, where the car cannot instantly achieve commanded velocity
+ * but must accelerate from the current velocity.
+ * 
+ * @param current_velocity m/s
+ * @param command_velocity m/s
+ * @param timestep timestep in seconds to integrate velocity across
+ * @returns estimated speed value for next timestep
+ */
 double getNewSpeed(double current_velocity, double command_velocity, double timestep);
 
-// Visualization for needed for latency
 void VisualizeLatencyInfo(amrl_msgs::VisualizationMsg &msg, std::vector<Eigen::Vector2f> &point_cloud, Eigen::Vector2f odom_loc, float odom_angle); 
 
-// Outline forward-predicted position of point cloud [blue]
+/**
+ * Outline forward-predicted position of point cloud [blue]
+ * 
+ * @param msg local viz message
+ * @param point_cloud reference to point cloud to be displayed
+ */
 void LatencyPointCloud(amrl_msgs::VisualizationMsg &msg, std::vector<Eigen::Vector2f>& point_cloud);
-// Outline forward-predicted position of car [blue]
+
+/**
+ * Outline forward-predicted position of car [blue]. Draws car at given angle and position
+ * relative to base link.
+ * 
+ * @param msg local viz message
+ * @param position position in m/s, x-forward y-left
+ * @param theta angle in radians
+ */
 void DrawCarLocal(amrl_msgs::VisualizationMsg &msg, Eigen::Vector2f position, float theta);
 } // namespace obstacle_avoidance             
 

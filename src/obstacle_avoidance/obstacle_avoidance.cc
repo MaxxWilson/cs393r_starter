@@ -306,7 +306,6 @@ void GoalOutliner(Eigen::Vector2f& goal, amrl_msgs::VisualizationMsg& msg){
     visualization::DrawCross(goal,0.5,0xfc4103,msg);
 }
 
-//Cleans when updated time variable is passed in
 void CleanVelocityBuffer(std::vector<navigation::CommandStamped> &v, uint64_t time){
   auto it = std::lower_bound(v.begin(), v.end(), time);
   v.erase(v.begin(), it-1);
