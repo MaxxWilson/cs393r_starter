@@ -36,13 +36,13 @@ const float dist_to_front_bumper = (length + wheel_base)/2 + safety_margin;
 const float dist_to_side_bumper = width/2 + safety_margin;
 const float dist_to_rear_bumper = (length-wheel_base)/2;
 
-const float max_curvature = 1.1; // +-0.75
-const float min_curvature = -1.1;
+const float max_curvature = 1.0; // +-0.75
+const float min_curvature = -1.0;
 
 // Dynamics
-const float max_acceleration = 6.0; //1.865;
-const float min_acceleration = -6.0; //-1.171;
-const float max_velocity = 1.0;
+const float max_acceleration = 6.0;
+const float min_acceleration = -6.0;
+const float max_velocity = 2.0;
 
 
 // Algorithmic Parameters
@@ -56,9 +56,9 @@ const float clearance_gain = 20.0;
 const float dist_goal_gain = -0.1;
 
 //Latency 
-const uint64_t sys_latency = 1e9 * 0.215; //(.215) * 1e9; // ns
-const uint64_t sensing_latency =  2*sys_latency/4;
-const uint64_t actuation_latency = 2*sys_latency/4;
+const uint64_t sys_latency = 1e9 * 0.215; // ns
+const uint64_t sensing_latency =  1*sys_latency/4;
+const uint64_t actuation_latency = 3*sys_latency/4;
 
 }
 
