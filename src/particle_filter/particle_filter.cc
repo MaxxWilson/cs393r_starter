@@ -61,6 +61,7 @@ void ParticleFilter::GetParticles(vector<Particle>* particles) const {
   *particles = particles_;
 }
 
+// Yuhong
 void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
                                             const float angle,
                                             int num_ranges,
@@ -113,6 +114,7 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
   }
 }
 
+// Yuhong
 void ParticleFilter::Update(const vector<float>& ranges,
                             float range_min,
                             float range_max,
@@ -126,6 +128,7 @@ void ParticleFilter::Update(const vector<float>& ranges,
   // predicted point cloud.
 }
 
+// Maxx
 void ParticleFilter::Resample() {
   // Resample the particles, proportional to their weights.
   // The current particles are in the `particles_` variable. 
@@ -152,7 +155,7 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
   // A new laser scan observation is available (in the laser frame)
   // Call the Update and Resample steps as necessary.
 }
-
+// Melissa
 void ParticleFilter::Predict(const Vector2f& odom_loc,
                              const float odom_angle) {
   // Implement the predict step of the particle filter here.
@@ -169,6 +172,7 @@ void ParticleFilter::Predict(const Vector2f& odom_loc,
          "standard deviation of 2 : %f\n", x);
 }
 
+// Maxx
 void ParticleFilter::Initialize(const string& map_file,
                                 const Vector2f& loc,
                                 const float angle) {
@@ -191,3 +195,24 @@ void ParticleFilter::GetLocation(Eigen::Vector2f* loc_ptr,
 
 
 }  // namespace particle_filter
+
+///// Team Plan /////
+// Predict (Melissa)
+//    Given point and odometry msg, propogate point cloud forward
+// Update (Yuhong)
+//    predicted expected observation for a particle given map 
+//    Compare observation with prediction
+//    Assign weight to particle (Importance Weights?)
+//    Note: Only update after car has travelled a certain distance?
+// Resample (Maxx)
+//    Given a set of weighted particles, resample probabilistically
+//    Low-variance resampling
+//    resample less often (every N updates)
+
+// RECOMMENDED IMPLEMENTATION (Observation Likelihood Model)
+// 1) start with simple observation likelihood model, pure gaussian (Log Likelihood?)
+// 2) Test in simulator
+// 3) Tune standard deviation, gamma, to prevent overconfident estimates
+//
+// 4) Next, implement robust piece-wise observation likelihood model
+// 5) Tune params with logged data
