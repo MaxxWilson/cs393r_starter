@@ -99,6 +99,8 @@ void Navigation::UpdateOdometry(const Vector2f& loc,
     odom_start_angle_ = angle;
     odom_start_loc_ = loc;
     odom_initialized_ = true;
+    odom_loc_ = loc;
+    odom_angle_ = angle;
     odom_stamp_ = time - car_params::sensing_latency;
     return;
   }

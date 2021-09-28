@@ -84,6 +84,15 @@ void LaserCallback(const sensor_msgs::LaserScan& msg) {
   // Location of the laser on the robot. Assumes the laser is forward-facing.
   const Vector2f kLaserLoc(0.2, 0);
 
+  // Convert the LaserScan to a point cloud
+  // The LaserScan parameters are accessible as follows:
+  // msg.angle_increment // Angular increment between subsequent rays
+  // msg.angle_max // Angle of the first ray
+  // msg.angle_min // Angle of the last ray
+  // msg.range_max // Maximum observable range
+  // msg.range_min // Minimum observable range
+  // msg.ranges[i] // The range of the i'th ray
+  
   static vector<Vector2f> cloud(msg.ranges.size());
   
   for(std::size_t i = 0; i < msg.ranges.size(); i++){
@@ -96,7 +105,7 @@ void LaserCallback(const sensor_msgs::LaserScan& msg) {
     cloud[i] = Vector2f(x, y);
   }
 
-  navigation_->ObservePointCloud(cloud, msg.header.stamp.toNSec());
+  navigation_->ObservePointCloud(cloud, msg.header.stamp.toNSec()); // Upstream uses .toSec()?
   last_laser_msg_ = msg;
 }
 
