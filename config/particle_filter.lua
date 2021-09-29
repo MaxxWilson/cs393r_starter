@@ -6,4 +6,4 @@ init_x_sigma = 0.30
 init_y_sigma = 0.15
 init_r_sigma = 0.13
 
-num_particles = 100
+num_particles = 1000
