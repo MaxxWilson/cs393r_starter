@@ -154,7 +154,7 @@ void ParticleFilter::Resample() {
     double rand_weight = rng_.UniformRandom(0, weight_sum);
     auto new_particle_index = std::lower_bound(weight_bins.begin(), weight_bins.end(), rand_weight) - weight_bins.begin();
     new_particles[i] = particles_[new_particle_index];
-    new_particles[i].weight = 1/particles_.size();
+    new_particles[i].weight = 1/((double) particles_.size());
   }
   
   // After resampling:
@@ -163,7 +163,7 @@ void ParticleFilter::Resample() {
 
 // Maxx
 void ParticleFilter::LowVarianceResample() {
-  vector<Particle> new_particles;
+  vector<Particle> new_particles(particles_.size());
   vector<double> weight_bins(particles_.size());
   
   // Calculate weight sum, get bins sized by particle weights as vector
@@ -177,8 +177,9 @@ void ParticleFilter::LowVarianceResample() {
 
   for(std::size_t i = 0; i < particles_.size(); i++){
     auto new_particle_index = std::lower_bound(weight_bins.begin(), weight_bins.end(), select_weight) - weight_bins.begin();
-    select_weight = std::fmod(select_weight + 1/particles_.size(), weight_sum);
-    new_particles.push_back(particles_[new_particle_index]);
+    select_weight = std::fmod(select_weight + weight_sum/((double) particles_.size()), weight_sum);
+    new_particles[i] = particles_[new_particle_index];
+    new_particles[i].weight = rng_.UniformRandom(); // 1/((double) particles_.size());
   }
   
   // After resampling:
@@ -196,6 +197,7 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
                                   float angle_max) {
   // A new laser scan observation is available (in the laser frame)
   // Call the Update and Resample steps as necessary.
+  LowVarianceResample();
 }
 // Melissa
 void ParticleFilter::Predict(const Vector2f& odom_loc,
