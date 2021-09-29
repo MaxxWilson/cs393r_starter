@@ -28,7 +28,7 @@ SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
 SET(libs roslib roscpp rosbag glog gflags amrl-shared-lib boost_system lua5.1
-    pthread)
+    pthread gtest)
 
 ADD_LIBRARY(shared_library
             src/visualization/visualization.cc
@@ -51,6 +51,9 @@ ROSBUILD_ADD_EXECUTABLE(particle_filter
                         src/particle_filter/particle_filter_main.cc
                         src/particle_filter/particle_filter.cc)
 TARGET_LINK_LIBRARIES(particle_filter shared_library ${libs})
+
+ADD_EXECUTABLE(test_particle_filter src/particle_filter/particle_filter_test.cc)
+TARGET_LINK_LIBRARIES(test_particle_filter ${libs})
 
 ROSBUILD_ADD_EXECUTABLE(navigation
                         src/navigation/navigation_main.cc
