@@ -52,18 +52,19 @@ class ParticleFilterTest: public ::testing::Test {
   // Class members declared here can be used by all tests in the test suite.
 };
 
-TEST(ParticleFilterTest, TestResample) {
-    particle_filter::ParticleFilter filter;
+// TEST(ParticleFilterTest, TestResample) {
+//     particle_filter::ParticleFilter filter;
 
-   std::vector<particle_filter::Particle> particles(100);
+//    std::vector<particle_filter::Particle> particles(100);
 
-   for(particle_filter::Particle particle: particles){
-      particle.loc = Eigen::Vector2f();
-      particle.angle = 0.0;
-   }
+//    for(particle_filter::Particle particle: particles){
+//       particle.loc = Eigen::Vector2f();
+//       particle.angle = 0.0;
+//       particle.weight = ;
+//    }
 
-   filter.Resample();
-}
+//    filter.Resample();
+// }
 
 int main(int argc, char **argv) {
     ::testing::InitGoogleTest(&argc, argv);
