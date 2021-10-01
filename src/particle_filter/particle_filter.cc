@@ -47,6 +47,7 @@ using Eigen::Vector2i;
 using vector_map::VectorMap;
 
 DEFINE_double(num_particles, 50, "Number of particles");
+CONFIG_FLOAT(laser_offset, "laser_offset");
 
 namespace particle_filter {
 
@@ -81,17 +82,17 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
   
   scan.resize((int)(num_ranges / resize_factor));
   
-  
+  Vector2f laser_loc = loc + Vector2f(CONFIG_laser_offset, 0);
   // Fill in the entries of scan using array writes, e.g. scan[i] = ...
   for (size_t i = 0; i < scan.size(); ++i) {
     // Initialize the ray line
     line2f ray(0, 1, 2, 3);
     float ray_angle = angle + angle_min + resize_factor * i / num_ranges * (angle_max - angle_min);
-    ray.p0[0] = loc[0] + range_min * cos(ray_angle);
-    ray.p0[1] = loc[1] + range_min * sin(ray_angle);
-    ray.p0[0] = loc[0] + range_max * cos(ray_angle);
-    ray.p0[1] = loc[1] + range_max * sin(ray_angle);
-    Vector2f final_intersection = loc + range_max * Vector2f(cos(ray_angle), sin(ray_angle));
+    ray.p0[0] = laser_loc[0] + range_min * cos(ray_angle);
+    ray.p0[1] = laser_loc[1] + range_min * sin(ray_angle);
+    ray.p0[0] = laser_loc[0] + range_max * cos(ray_angle);
+    ray.p0[1] = laser_loc[1] + range_max * sin(ray_angle);
+    Vector2f final_intersection = laser_loc + range_max * Vector2f(cos(ray_angle), sin(ray_angle));
     double min_dist = range_max;
     
     for (size_t i = 0; i < map_.lines.size(); ++i) {
@@ -99,7 +100,7 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
       Vector2f intersection_point; // Return variable
       bool intersects = map_line.Intersection(ray, &intersection_point);
       if (intersects) {
-        double cur_dist = (intersection_point - loc).norm();
+        double cur_dist = (intersection_point - laser_loc).norm();
         if(cur_dist < min_dist) {
           final_intersection = intersection_point;
           min_dist = cur_dist;
