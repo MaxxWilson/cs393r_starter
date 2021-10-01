@@ -90,8 +90,8 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
     float ray_angle = angle + angle_min + resize_factor * i / num_ranges * (angle_max - angle_min);
     ray.p0[0] = laser_loc[0] + range_min * cos(ray_angle);
     ray.p0[1] = laser_loc[1] + range_min * sin(ray_angle);
-    ray.p0[0] = laser_loc[0] + range_max * cos(ray_angle);
-    ray.p0[1] = laser_loc[1] + range_max * sin(ray_angle);
+    ray.p1[0] = laser_loc[0] + range_max * cos(ray_angle);
+    ray.p1[1] = laser_loc[1] + range_max * sin(ray_angle);
     Vector2f final_intersection = laser_loc + range_max * Vector2f(cos(ray_angle), sin(ray_angle));
     double min_dist = range_max;
     
