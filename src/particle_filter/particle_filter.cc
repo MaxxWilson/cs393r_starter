@@ -82,9 +82,10 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
   
   scan.resize((int)(num_ranges / resize_factor));
   
-  Vector2f laser_loc = loc + Vector2f(CONFIG_laser_offset, 0);
+  // Location of LIDAR in map frame
+  Vector2f laser_loc = loc + Vector2f(CONFIG_laser_offset*cos(angle), CONFIG_laser_offset*sin(angle));
   // Fill in the entries of scan using array writes, e.g. scan[i] = ...
-  for (size_t i = 0; i < scan.size(); ++i) {
+  for (size_t i = 0; i < scan.size(); ++i) { // for each ray
     // Initialize the ray line
     line2f ray(0, 1, 2, 3);
     float ray_angle = angle + angle_min + resize_factor * i / num_ranges * (angle_max - angle_min);
@@ -95,7 +96,7 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
     Vector2f final_intersection = laser_loc + range_max * Vector2f(cos(ray_angle), sin(ray_angle));
     double min_dist = range_max;
     
-    for (size_t i = 0; i < map_.lines.size(); ++i) {
+    for (size_t i = 0; i < map_.lines.size(); ++i) { // for each line in map
       const line2f map_line = map_.lines[i];
       Vector2f intersection_point; // Return variable
       bool intersects = map_line.Intersection(ray, &intersection_point);
