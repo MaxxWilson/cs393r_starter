@@ -78,54 +78,74 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
   // expected observations, to be used for the update step.
 
   // Note: The returned values must be set using the `scan` variable:
-  scan.resize(num_ranges);
+  
+  scan.resize((int)(num_ranges / resize_factor));
+  
+  
   // Fill in the entries of scan using array writes, e.g. scan[i] = ...
   for (size_t i = 0; i < scan.size(); ++i) {
-    scan[i] = Vector2f(0, 0);
-  }
-
-  // The line segments in the map are stored in the `map_.lines` variable. You
-  // can iterate through them as:
-  for (size_t i = 0; i < map_.lines.size(); ++i) {
-    const line2f map_line = map_.lines[i];
-    // The line2f class has helper functions that will be useful.
-    // You can create a new line segment instance as follows, for :
-    line2f my_line(1, 2, 3, 4); // Line segment from (1,2) to (3.4).
-    // Access the end points using `.p0` and `.p1` members:
-    printf("P0: %f, %f P1: %f,%f\n", 
-           my_line.p0.x(),
-           my_line.p0.y(),
-           my_line.p1.x(),
-           my_line.p1.y());
-
-    // Check for intersections:
-    bool intersects = map_line.Intersects(my_line);
-    // You can also simultaneously check for intersection, and return the point
-    // of intersection:
-    Vector2f intersection_point; // Return variable
-    intersects = map_line.Intersection(my_line, &intersection_point);
-    if (intersects) {
-      printf("Intersects at %f,%f\n", 
-             intersection_point.x(),
-             intersection_point.y());
-    } else {
-      printf("No intersection\n");
+    // Initialize the ray line
+    line2f ray(0, 1, 2, 3);
+    float ray_angle = angle + angle_min + resize_factor * i / num_ranges * (angle_max - angle_min);
+    ray.p0[0] = loc[0] + range_min * cos(ray_angle);
+    ray.p0[1] = loc[1] + range_min * sin(ray_angle);
+    ray.p0[0] = loc[0] + range_max * cos(ray_angle);
+    ray.p0[1] = loc[1] + range_max * sin(ray_angle);
+    Vector2f final_intersection = loc + range_max * Vector2f(cos(ray_angle), sin(ray_angle));
+    double min_dist = range_max;
+    
+    for (size_t i = 0; i < map_.lines.size(); ++i) {
+      const line2f map_line = map_.lines[i];
+      Vector2f intersection_point; // Return variable
+      bool intersects = map_line.Intersection(ray, &intersection_point);
+      if (intersects) {
+        double cur_dist = (intersection_point - loc).norm();
+        if(cur_dist < min_dist) {
+          final_intersection = intersection_point;
+          min_dist = cur_dist;
+        }
+      }
     }
+
+    scan[i] = final_intersection;
   }
+
+  
 }
 
 // Yuhong
+// Update the weight of the particle based on how well it fits the observation
 void ParticleFilter::Update(const vector<float>& ranges,
                             float range_min,
                             float range_max,
                             float angle_min,
                             float angle_max,
                             Particle* p_ptr) {
-  // Implement the update step of the particle filter here.
-  // You will have to use the `GetPredictedPointCloud` to predict the expected
-  // observations for each particle, and assign weights to the particles based
-  // on the observation likelihood computed by relating the observation to the
-  // predicted point cloud.
+  // Get predicted point cloud
+  Particle &particle = *p_ptr;
+  vector<Vector2f> predicted_cloud;
+  GetPredictedPointCloud(particle.loc, 
+                         particle.angle, 
+                         ranges.size(), 
+                         range_min, 
+                         range_max,
+                         angle_min,
+                         angle_max,
+                         &predicted_cloud);
+  // resize the ranges
+  vector<float> trimmed_ranges(predicted_cloud.size());
+  for(int i = 0; i < predicted_cloud.size(); i++) {
+    trimmed_ranges[i] = ranges[i * resize_factor];
+  }
+  float particle_weight = 0;
+  // Calculate the particle weight
+  for(int i = 0; i < predicted_cloud.size(); i++) {
+    float predicted_range = (predicted_cloud[i] - particle.loc).norm();
+    float diff = abs(trimmed_ranges[i] - predicted_range);
+    particle_weight += -diff; // smaller the diff, larger the particle weight
+  }
+  particle.weight = 0;
+  particle.weight = particle_weight;
 }
 
 // Maxx
