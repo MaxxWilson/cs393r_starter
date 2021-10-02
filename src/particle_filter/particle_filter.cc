@@ -47,6 +47,7 @@ using Eigen::Vector2i;
 using vector_map::VectorMap;
 
 DEFINE_double(num_particles, 50, "Number of particles");
+CONFIG_FLOAT(laser_offset, "laser_offset");
 
 namespace particle_filter {
 
@@ -81,20 +82,19 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
   
   scan.resize((int)(num_ranges / resize_factor));
   
-  
   // Fill in the entries of scan using array writes, e.g. scan[i] = ...
-  for (size_t i = 0; i < scan.size(); ++i) {
+  for (size_t i = 0; i < scan.size(); ++i) { // for each ray
     // Initialize the ray line
     line2f ray(0, 1, 2, 3);
     float ray_angle = angle + angle_min + resize_factor * i / num_ranges * (angle_max - angle_min);
     ray.p0[0] = loc[0] + range_min * cos(ray_angle);
     ray.p0[1] = loc[1] + range_min * sin(ray_angle);
-    ray.p0[0] = loc[0] + range_max * cos(ray_angle);
-    ray.p0[1] = loc[1] + range_max * sin(ray_angle);
+    ray.p1[0] = loc[0] + range_max * cos(ray_angle);
+    ray.p1[1] = loc[1] + range_max * sin(ray_angle);
     Vector2f final_intersection = loc + range_max * Vector2f(cos(ray_angle), sin(ray_angle));
     double min_dist = range_max;
     
-    for (size_t i = 0; i < map_.lines.size(); ++i) {
+    for (size_t i = 0; i < map_.lines.size(); ++i) { // for each line in map
       const line2f map_line = map_.lines[i];
       Vector2f intersection_point; // Return variable
       bool intersects = map_line.Intersection(ray, &intersection_point);
@@ -124,7 +124,8 @@ void ParticleFilter::Update(const vector<float>& ranges,
   // Get predicted point cloud
   Particle &particle = *p_ptr;
   vector<Vector2f> predicted_cloud;
-  GetPredictedPointCloud(particle.loc, 
+  Vector2f sensor_loc = BaseLinkToSensorFrame(particle.loc, particle.angle);
+  GetPredictedPointCloud(sensor_loc, 
                          particle.angle, 
                          ranges.size(), 
                          range_min, 
@@ -140,7 +141,12 @@ void ParticleFilter::Update(const vector<float>& ranges,
   float particle_weight = 0;
   // Calculate the particle weight
   for(int i = 0; i < predicted_cloud.size(); i++) {
-    float predicted_range = (predicted_cloud[i] - particle.loc).norm();
+    // Observation likelihood function, See Lecture 7, Slide 30
+    // 1) Center gaussian on predicted range
+    // 2) Evaluate gaussian at actual range to get likelihood
+    // 3) Multiply all scan likelihoods together for total particle weight
+    // *Note* Use log-likelihood to maintain precision
+    float predicted_range = (predicted_cloud[i] - sensor_loc).norm();
     float diff = abs(trimmed_ranges[i] - predicted_range);
     particle_weight += -diff; // smaller the diff, larger the particle weight
   }
@@ -213,6 +219,9 @@ void ParticleFilter::GetLocation(Eigen::Vector2f* loc_ptr,
   angle = 0;
 }
 
+Eigen::Vector2f BaseLinkToSensorFrame(const Vector2f &loc, const float &angle){
+  return loc + Vector2f(CONFIG_laser_offset*cos(angle), CONFIG_laser_offset*sin(angle));
+}
 
 }  // namespace particle_filter
 
