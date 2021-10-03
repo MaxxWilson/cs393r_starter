@@ -104,6 +104,8 @@ class ParticleFilter {
   bool odom_initialized_;
   double resize_factor = 10.0; // factor used to trim to point cloud size to accelerate calculation
   double lidar_length = 0.15; // distance from odom to lidar
+  double vairance = 1;
+  double gamma = 1;
 };
 }  // namespace slam
 

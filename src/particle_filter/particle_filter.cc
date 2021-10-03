@@ -137,15 +137,16 @@ void ParticleFilter::Update(const vector<float>& ranges,
   for(int i = 0; i < predicted_cloud.size(); i++) {
     trimmed_ranges[i] = ranges[i * resize_factor];
   }
-  float particle_weight = 0;
+  float log_error = 0;
   // Calculate the particle weight
   for(int i = 0; i < predicted_cloud.size(); i++) {
     float predicted_range = (predicted_cloud[i] - particle.loc).norm();
     float diff = abs(trimmed_ranges[i] - predicted_range);
-    particle_weight += -diff; // smaller the diff, larger the particle weight
+    log_error += std::pow(-Sq(diff) / vairance, gamma); // smaller the diff, larger the particle weight
+
   }
   particle.weight = 0;
-  particle.weight = particle_weight;
+  particle.weight = log_error;
 }
 
 // Maxx
