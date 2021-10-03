@@ -46,6 +46,10 @@ using Eigen::Vector2f;
 using Eigen::Vector2i;
 using vector_map::VectorMap;
 
+CONFIG_INT(num_particles, "num_particles");
+CONFIG_FLOAT(init_x_sigma, "init_x_sigma");
+CONFIG_FLOAT(init_y_sigma, "init_y_sigma");
+CONFIG_FLOAT(init_r_sigma, "init_r_sigma");
 DEFINE_double(num_particles, 50, "Number of particles");
 CONFIG_FLOAT(laser_offset, "laser_offset");
 
@@ -161,17 +165,55 @@ void ParticleFilter::Resample() {
   // The current particles are in the `particles_` variable. 
   // Create a variable to store the new particles, and when done, replace the
   // old set of particles:
-  // vector<Particle> new_particles';
-  // During resampling: 
-  //    new_particles.push_back(...)
-  // After resampling:
-  // particles_ = new_particles;
+  vector<Particle> new_particles(particles_.size());
+  vector<double> weight_bins(particles_.size());
+  
+  // Calculate weight sum, get bins sized by particle weights as vector
+  double weight_sum = 0;
+  for(std::size_t i = 0; i < particles_.size(); i++){
+    weight_sum += particles_[i].weight;
+    weight_bins[i] = weight_sum;
+  }
 
-  // You will need to use the uniform random number generator provided. For
-  // example, to generate a random number between 0 and 1:
-  float x = rng_.UniformRandom(0, 1);
-  printf("Random number drawn from uniform distribution between 0 and 1: %f\n",
-         x);
+  // During resampling:
+  for(std::size_t i = 0; i < particles_.size(); i++){
+    double rand_weight = rng_.UniformRandom(0, weight_sum);
+    auto new_particle_index = std::lower_bound(weight_bins.begin(), weight_bins.end(), rand_weight) - weight_bins.begin();
+    new_particles[i] = particles_[new_particle_index];
+    new_particles[i].weight = 1/((double) particles_.size());
+  }
+  
+  // After resampling:
+  particles_ = new_particles;
+}
+
+// Maxx
+void ParticleFilter::LowVarianceResample() {
+  vector<Particle> new_particles(particles_.size());
+  vector<double> weight_bins(particles_.size());
+  
+  // Calculate weight sum, get bins sized by particle weights as vector
+  double weight_sum = 0;
+  for(std::size_t i = 0; i < particles_.size(); i++){
+    weight_sum += particles_[i].weight;
+    weight_bins[i] = weight_sum;
+  }
+
+  double select_weight = rng_.UniformRandom(0, weight_sum);
+
+  for(std::size_t i = 0; i < particles_.size(); i++){
+    auto new_particle_index = std::lower_bound(weight_bins.begin(), weight_bins.end(), select_weight) - weight_bins.begin();
+    select_weight = std::fmod(select_weight + weight_sum/((double) particles_.size()), weight_sum);
+    new_particles[i] = particles_[new_particle_index];
+    new_particles[i].weight = rng_.UniformRandom(); // 1/((double) particles_.size());
+  }
+  
+  // After resampling:
+  particles_ = new_particles;
+}
+
+void ParticleFilter::SetParticlesForTesting(vector<Particle> new_particles){
+  particles_ = new_particles;
 }
 
 void ParticleFilter::ObserveLaser(const vector<float>& ranges,
@@ -181,6 +223,7 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
                                   float angle_max) {
   // A new laser scan observation is available (in the laser frame)
   // Call the Update and Resample steps as necessary.
+  LowVarianceResample();
 }
 // Melissa
 void ParticleFilter::Predict(const Vector2f& odom_loc,
@@ -194,9 +237,8 @@ void ParticleFilter::Predict(const Vector2f& odom_loc,
   // You will need to use the Gaussian random number generator provided. For
   // example, to generate a random number from a Gaussian with mean 0, and
   // standard deviation 2:
-  float x = rng_.Gaussian(0.0, 2.0);
-  printf("Random number drawn from Gaussian distribution with 0 mean and "
-         "standard deviation of 2 : %f\n", x);
+  
+  //float x = rng_.Gaussian(0.0, 2.0);
 }
 
 // Maxx
@@ -206,6 +248,18 @@ void ParticleFilter::Initialize(const string& map_file,
   // The "set_pose" button on the GUI was clicked, or an initialization message
   // was received from the log. Initialize the particles accordingly, e.g. with
   // some distribution around the provided location and angle.
+
+  particles_.resize(CONFIG_num_particles);
+
+  for(Particle &particle: particles_){
+    particle.loc = Eigen::Vector2f(
+      loc[0] + rng_.Gaussian(0, CONFIG_init_x_sigma),
+      loc[1] + rng_.Gaussian(0, CONFIG_init_y_sigma)
+      );
+    particle.angle = rng_.Gaussian(angle, CONFIG_init_r_sigma);
+    particle.weight = 1/((double)particles_.size());
+  }
+
   map_.Load(map_file);
 }
 
@@ -216,8 +270,16 @@ void ParticleFilter::GetLocation(Eigen::Vector2f* loc_ptr,
   // Compute the best estimate of the robot's location based on the current set
   // of particles. The computed values must be set to the `loc` and `angle`
   // variables to return them. Modify the following assignments:
-  loc = Vector2f(0, 0);
-  angle = 0;
+
+  double weight_sum = 0;
+  for(Particle particle: particles_){
+    loc += particle.loc * particle.weight;
+    angle += particle.angle * particle.weight;
+    weight_sum += particle.weight;
+  }
+
+  loc /= weight_sum;
+  angle /= weight_sum;
 }
 
 Eigen::Vector2f BaseLinkToSensorFrame(const Vector2f &loc, const float &angle){
@@ -238,6 +300,7 @@ Eigen::Vector2f BaseLinkToSensorFrame(const Vector2f &loc, const float &angle){
 //    Given a set of weighted particles, resample probabilistically
 //    Low-variance resampling
 //    resample less often (every N updates)
+//    TODO: Importance Sampling
 
 // RECOMMENDED IMPLEMENTATION (Observation Likelihood Model)
 // 1) start with simple observation likelihood model, pure gaussian (Log Likelihood?)
