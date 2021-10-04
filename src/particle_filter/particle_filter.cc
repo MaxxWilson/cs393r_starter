@@ -272,17 +272,20 @@ void ParticleFilter::GetLocation(Eigen::Vector2f* loc_ptr,
   // variables to return them. Modify the following assignments:
 
   double weight_sum = 0;
+  double angle_x_sum = 0;
+  Eigen::Vector2f angle_point = Eigen::Vector2f(0, 0);
   for(Particle particle: particles_){
     loc += particle.loc * particle.weight;
-    angle += particle.angle * particle.weight;
+    angle_point += Eigen::Vector2f(cos(particle.angle), sin(particle.angle)) * particle.weight;
     weight_sum += particle.weight;
   }
 
   loc /= weight_sum;
-  angle /= weight_sum;
+  angle_point /= weight_sum;
+  angle = atan2(angle_point[1], angle_point[0]);
 }
 
-Eigen::Vector2f BaseLinkToSensorFrame(const Vector2f &loc, const float &angle){
+Eigen::Vector2f ParticleFilter::BaseLinkToSensorFrame(const Eigen::Vector2f &loc, const float &angle){
   return loc + Vector2f(CONFIG_laser_offset*cos(angle), CONFIG_laser_offset*sin(angle));
 }
 

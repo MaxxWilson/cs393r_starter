@@ -91,6 +91,8 @@ class ParticleFilter {
 
   void SetParticlesForTesting(std::vector<Particle> new_particles);
 
+  Eigen::Vector2f BaseLinkToSensorFrame(const Eigen::Vector2f &loc, const float &angle);
+
  private:
 
   // List of particles being tracked.
