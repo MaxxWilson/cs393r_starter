@@ -205,7 +205,7 @@ void ParticleFilter::LowVarianceResample() {
     auto new_particle_index = std::lower_bound(weight_bins.begin(), weight_bins.end(), select_weight) - weight_bins.begin();
     select_weight = std::fmod(select_weight + weight_sum/((double) particles_.size()), weight_sum);
     new_particles[i] = particles_[new_particle_index];
-    new_particles[i].weight = rng_.UniformRandom(); // 1/((double) particles_.size());
+    new_particles[i].weight = 1/((double) particles_.size()); // rng_.UniformRandom(); good for testing
   }
   
   // After resampling:
