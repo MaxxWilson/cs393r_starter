@@ -209,7 +209,7 @@ void ParticleFilter::LowVarianceResample() {
     auto new_particle_index = std::lower_bound(weight_bins.begin(), weight_bins.end(), select_weight) - weight_bins.begin();
     select_weight = std::fmod(select_weight + weight_sum/((double) particles_.size()), weight_sum);
     new_particles[i] = particles_[new_particle_index];
-    new_particles[i].weight = rng_.UniformRandom(); // 1/((double) particles_.size());
+    new_particles[i].weight = 1/((double) particles_.size()); // rng_.UniformRandom(); good for testing
   }
   
   // After resampling:
@@ -322,14 +322,17 @@ void ParticleFilter::GetLocation(Eigen::Vector2f* loc_ptr,
   // variables to return them. Modify the following assignments:
 
   double weight_sum = 0;
+  double angle_x_sum = 0;
+  Eigen::Vector2f angle_point = Eigen::Vector2f(0, 0);
   for(Particle particle: particles_){
     loc += particle.loc * particle.weight;
-    angle += particle.angle * particle.weight;
+    angle_point += Eigen::Vector2f(cos(particle.angle), sin(particle.angle)) * particle.weight;
     weight_sum += particle.weight;
   }
 
   loc /= weight_sum;
-  angle /= weight_sum;
+  angle_point /= weight_sum;
+  angle = atan2(angle_point[1], angle_point[0]);
 }
 
 Eigen::Vector2f ParticleFilter::BaseLinkToSensorFrame(const Eigen::Vector2f &loc, const float &angle){
