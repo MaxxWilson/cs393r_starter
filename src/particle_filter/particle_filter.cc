@@ -184,8 +184,8 @@ void ParticleFilter::Update(const vector<float>& ranges,
   // Calculate the particle weight
   for(std::size_t i = 0; i < predicted_cloud.size(); i++) {
     double predicted_range = (predicted_cloud[i] - sensor_loc).norm();
-    //double diff = GetRobustObservationLikelihood(trimmed_ranges[i], predicted_range, CONFIG_dist_short, CONFIG_dist_long);
-    double diff = trimmed_ranges[i] - predicted_range;
+    double diff = GetRobustObservationLikelihood(trimmed_ranges[i], predicted_range, CONFIG_dist_short, CONFIG_dist_long);
+    //double diff = trimmed_ranges[i] - predicted_range;
     log_error += -CONFIG_gamma * Sq(diff) / Sq(CONFIG_sigma_observation);
 
   }
