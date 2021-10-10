@@ -109,10 +109,13 @@ class ParticleFilter {
   Eigen::Vector2f prev_odom_loc_;
   float prev_odom_angle_;
   bool odom_initialized_;
-  double resize_factor = 10.0; // factor used to trim to point cloud size to accelerate calculation
-  double lidar_length = 0.15; // distance from odom to lidar
-  double vairance = 1;
-  double gamma = 1;
+  
+  std::vector<double> weight_bins_;
+  double max_weight_log_ = 0;
+  double weight_sum_ = 0;
+
+  Eigen::Vector2f last_update_loc_;
+  int resample_loop_counter_ = 0;
 };
 }  // namespace slam
 

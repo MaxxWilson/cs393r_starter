@@ -225,8 +225,8 @@ void Navigation::Run(){
   TransformPointCloud(pc_to_odom_transform);
 
   // Visualize Latency Compensation
-  obstacle_avoidance::LatencyPointCloud(local_viz_msg_, transformed_point_cloud_);
-  obstacle_avoidance::DrawCarLocal(local_viz_msg_, odom_state_tf.position, odom_state_tf.theta);
+  //obstacle_avoidance::LatencyPointCloud(local_viz_msg_, transformed_point_cloud_);
+  //obstacle_avoidance::DrawCarLocal(local_viz_msg_, odom_state_tf.position, odom_state_tf.theta);
 
   // "Carrot on a stick" goal point, and resulting goal curvature
   Eigen::Vector2f goal_point(4, 0.0);
@@ -260,10 +260,17 @@ void Navigation::Run(){
 
   // 6) Select best path from scoring function
   struct PathOption best_path = obstacle_avoidance::ChooseBestPath(path_options,goal_point);
-  obstacle_avoidance::VisualizeObstacleAvoidanceInfo(goal_point,path_options,best_path,local_viz_msg_);
+  //obstacle_avoidance::VisualizeObstacleAvoidanceInfo(goal_point,path_options,best_path,local_viz_msg_);
   
   // 7) Publish commands with 1-D TOC, update vector of previous vehicle commands
-  TimeOptimalControl(best_path);
+  //TimeOptimalControl(best_path);
+
+    // Remove for obstacle avoidance
+    drive_msg_.curvature = 0.0;
+    drive_msg_.velocity = 1.0;
+    drive_pub_.publish(drive_msg_);
+    // Remove for obstacle avoidance
+    
   CommandStamped drive_cmd(drive_msg_.velocity, drive_msg_.curvature, drive_msg_.header.stamp.toNSec() + car_params::actuation_latency);
   vel_commands_.push_back(drive_cmd);
 
