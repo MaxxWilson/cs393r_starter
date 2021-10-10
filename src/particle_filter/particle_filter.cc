@@ -288,30 +288,56 @@ void ParticleFilter::Predict(const Vector2f& odom_loc,
   // float r = d / (2*sin(odom_angle));
   // float arc_dist = r * odom_angle;
 
-  //Transform to map frame from odom frame
   auto R_odom = Eigen::Rotation2D<float>(-prev_odom_angle_).toRotationMatrix();
-  Eigen::Vector2f del_T_base = R_odom * (odom_loc - prev_odom_loc_);
+  // Eigen::Vector2f del_T_base = R_odom * (odom_loc - prev_odom_loc_);
+  Eigen::Vector2f del_T = (odom_loc - prev_odom_loc_);
+
+  Eigen::Vector2f zero;
+  zero << (0, 0);
+  if(!del_T.isApprox(zero))
+    std::cout<<"del_T: " << del_T << "\n";
 
   for(Particle &particle: particles_){
-    
+
     auto R_map = Eigen::Rotation2D<float>(particle.angle).toRotationMatrix();
 
-    float sigma_x = CONFIG_k1 * del_T_base.norm() + CONFIG_k2 * abs(math_util::AngleDiff(odom_angle, prev_odom_angle_)); // x and y
-    float sigma_y = CONFIG_k1 * del_T_base.norm() + CONFIG_k2 * abs(math_util::AngleDiff(odom_angle, prev_odom_angle_));
-    float sigma_tht = CONFIG_k3 * del_T_base.norm() + CONFIG_k4 * abs(math_util::AngleDiff(odom_angle, prev_odom_angle_)); // tht
+
+    //float sigma_x = CONFIG_k1 * del_T_base.norm() + CONFIG_k2 * abs(math_util::AngleDiff(odom_angle, prev_odom_angle_)); // x and y
+    //float sigma_y = CONFIG_k1 * del_T_base.norm() + CONFIG_k2 * abs(math_util::AngleDiff(odom_angle, prev_odom_angle_));
+    //float sigma_tht = CONFIG_k3 * del_T_base.norm() + CONFIG_k4 * abs(math_util::AngleDiff(odom_angle, prev_odom_angle_)); // tht
+
+    // float e_x = rng_.Gaussian(0.0, sigma_x);
+    // float e_y = rng_.Gaussian(0.0, sigma_y);
+    // float e_tht = rng_.Gaussian(0.0, sigma_tht);
+
+    // particle.loc += R_map * del_T_base + Eigen::Vector2f(e_x, e_y);
+    // particle.angle += odom_angle - prev_odom_angle_ + e_tht;
+
+    float sigma_x = k1 * del_T[0];
+    float sigma_y = k2 * del_T[1];
+    float sigma_tht = k3 * (math_util::AngleDiff(odom_angle, prev_odom_angle_));
     
-    float e_x = rng_.Gaussian(0.0, sigma_x);
-    float e_y = rng_.Gaussian(0.0, sigma_y);
+    Eigen::Vector2f e_xy;
+    e_xy << ((float) rng_.Gaussian(0.0, sigma_x),(float) rng_.Gaussian(0.0, sigma_y));
     float e_tht = rng_.Gaussian(0.0, sigma_tht);
-    
-    //implement for all of previous locations in distribution
-    particle.loc += R_map * del_T_base + Eigen::Vector2f(e_x, e_y);
-    particle.angle += odom_angle - prev_odom_angle_ + e_tht;
+
+    Eigen::Vector2f est_del_T = R_odom * (del_T + e_xy);
+    particle.loc += R_map * est_del_T;   
+
+    particle.angle += odom_angle - prev_odom_angle_ + e_tht;        
   }
 
   prev_odom_loc_[0] = odom_loc[0];
   prev_odom_loc_[1] = odom_loc[1];
   prev_odom_angle_ = odom_angle;
+
+   // TransformToMap(odom_loc, odom_angle);
+ 
+}
+
+void TransformToMap(const Vector2f& odom_loc,
+                     const float odom_angle){
+      
 }
 
 // Maxx
@@ -326,8 +352,8 @@ void ParticleFilter::Initialize(const string& map_file,
 
   for(Particle &particle: particles_){
     particle.loc = Eigen::Vector2f(
-      loc[0] + rng_.Gaussian(0, CONFIG_init_x_sigma),
-      loc[1] + rng_.Gaussian(0, CONFIG_init_y_sigma)
+      loc[0], // + rng_.Gaussian(0, CONFIG_init_x_sigma),
+      loc[1] // + rng_.Gaussian(0, CONFIG_init_y_sigma)
       );
     particle.angle = angle; //rng_.Gaussian(angle, CONFIG_init_r_sigma);
     particle.weight = 1/((double)particles_.size());
