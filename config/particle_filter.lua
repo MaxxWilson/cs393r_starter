@@ -20,8 +20,8 @@ k1 = 0.0 -- x error from translation
 k2 = 0.0 -- x error from rotation
 k3 = 0.0 -- y error from translation
 k4 = 0.0 -- y error from rotation
-k5 = 0.1 -- tht error from translation
-k6 = 0.0 -- tht error from rotation
+k5 = 0.0 -- rotation error from translation
+k6 = 0.5 -- rotation error from rotation
 
 resize_factor = 10 -- # num_points / resize_factor = num_rays
 

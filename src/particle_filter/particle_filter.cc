@@ -142,7 +142,7 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
 double GetRobustObservationLikelihood(double measured, double expected, double dist_short, double dist_long){
   
   if(measured < CONFIG_range_min || measured > CONFIG_range_max){
-
+    return 0;
   }
   else if(measured < (expected - dist_short)){
     return dist_short;
@@ -280,65 +280,43 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
 //described in lect 9/15
 void ParticleFilter::Predict(const Vector2f& odom_loc,
                              const float odom_angle) {
-  // Implement the predict step of the particle filter here.
   // A new odometry value is available (in the odom frame)
-  // Implement the motion model predict step here, to propagate the particles
-  // forward based on odometry.
+  // propagate particles forward based on odometry.
 
   // float d = sqrt(pow(odom_loc[0],2) + pow(odom_loc[1],2));
   // float r = d / (2*sin(odom_angle));
   // float arc_dist = r * odom_angle;
 
-  auto R_odom = Eigen::Rotation2D<float>(-prev_odom_angle_).toRotationMatrix();
-  Eigen::Vector2f del_T_base = R_odom * (odom_loc - prev_odom_loc_);
-
-  // Eigen::Vector2f zero;
-  // zero << (0, 0);
-  // if(!del_T.isApprox(zero))
-  //   std::cout<<"del_T: " << del_T << "\n";
+  // rotation matrix from last odom to last baselink
+  auto rot_odom1_to_bl1 = Eigen::Rotation2D<float>(-prev_odom_angle_).toRotationMatrix();
+  
+  // Change in translation and angle from odometry
+  Eigen::Vector2f delta_translation = rot_odom1_to_bl1 * (odom_loc - prev_odom_loc_);
+  float delta_angle = math_util::AngleDiff(odom_angle, prev_odom_angle_);
 
   for(Particle &particle: particles_){
+    // Get noisy angle
+    float sigma_tht = CONFIG_k5 * delta_translation.norm() + CONFIG_k6 * abs(delta_angle);
+    float noisy_angle = delta_angle + rng_.Gaussian(0.0, sigma_tht);
 
-    auto R_map = Eigen::Rotation2D<float>(particle.angle).toRotationMatrix();
-
-    // float sigma_x = CONFIG_k1 * del_T_base.norm() + CONFIG_k2 * abs(math_util::AngleDiff(odom_angle, prev_odom_angle_)); // x and y
-    // float sigma_y = CONFIG_k1 * del_T_base.norm() + CONFIG_k2 * abs(math_util::AngleDiff(odom_angle, prev_odom_angle_));
-    // float sigma_tht = CONFIG_k3 * del_T_base.norm() + CONFIG_k4 * abs(math_util::AngleDiff(odom_angle, prev_odom_angle_)); // tht
-
-    // float e_x = rng_.Gaussian(0.0, sigma_x);
-    // float e_y = rng_.Gaussian(0.0, sigma_y);
-    // float e_tht = rng_.Gaussian(0.0, sigma_tht);
-
-    // particle.loc += R_map * del_T_base + Eigen::Vector2f(e_x, e_y);
-    // particle.angle += odom_angle - prev_odom_angle_ + e_tht;
-    float sigma_tht = CONFIG_k5 * del_T_base.norm() + CONFIG_k6 * abs(math_util::AngleDiff(odom_angle, prev_odom_angle_));
-    float e_tht = rng_.Gaussian(0.0, sigma_tht);
-    float adj_tht = math_util::AngleDiff(odom_angle, prev_odom_angle_) + e_tht;
-    auto R_b2 = Eigen::Rotation2D<float>(adj_tht).toRotationMatrix();
-
-    float sigma_x = CONFIG_k1 * del_T_base.norm() + CONFIG_k2 * abs(math_util::AngleDiff(odom_angle, prev_odom_angle_));;
-    float sigma_y = CONFIG_k3 * del_T_base.norm() + CONFIG_k4 * abs(math_util::AngleDiff(odom_angle, prev_odom_angle_));
-
-    
+    // Get translation noise in Base Link 2
+    float sigma_x = CONFIG_k1 * delta_translation.norm() + CONFIG_k2 * abs(delta_angle);;
+    float sigma_y = CONFIG_k3 * delta_translation.norm() + CONFIG_k4 * abs(delta_angle);
     Eigen::Vector2f e_xy = Eigen::Vector2f((float) rng_.Gaussian(0.0, sigma_x),(float) rng_.Gaussian(0.0, sigma_y));
 
-    Eigen::Vector2f est_del_T = del_T_base + (R_b2 * e_xy); // in previous base_link
-    particle.loc += R_map * est_del_T;   
-
-    particle.angle += adj_tht;        
+    // Transform noise to Base Link 1 using estimated angle to get noisy translation
+    auto rot_b1_to_b2 = Eigen::Rotation2D<float>(noisy_angle).toRotationMatrix();
+    Eigen::Vector2f noisy_translation = delta_translation + rot_b1_to_b2 * e_xy; // in previous base_link
+    
+    // Transform noise to map using current particle angle
+    auto rot_bl1_to_map = Eigen::Rotation2D<float>(particle.angle).toRotationMatrix();
+    particle.loc += rot_bl1_to_map * noisy_translation;   
+    particle.angle += noisy_angle;        
   }
 
-  prev_odom_loc_[0] = odom_loc[0];
-  prev_odom_loc_[1] = odom_loc[1];
+  // Update previous odometry
+  prev_odom_loc_ = odom_loc;
   prev_odom_angle_ = odom_angle;
-
-   // TransformToMap(odom_loc, odom_angle);
- 
-}
-
-void TransformToMap(const Vector2f& odom_loc,
-                     const float odom_angle){
-      
 }
 
 // Maxx
@@ -353,8 +331,8 @@ void ParticleFilter::Initialize(const string& map_file,
 
   for(Particle &particle: particles_){
     particle.loc = Eigen::Vector2f(
-      loc[0], // + rng_.Gaussian(0, CONFIG_init_x_sigma),
-      loc[1] // + rng_.Gaussian(0, CONFIG_init_y_sigma)
+      loc[0] + rng_.Gaussian(0, CONFIG_init_x_sigma),
+      loc[1] + rng_.Gaussian(0, CONFIG_init_y_sigma)
       );
     particle.angle = angle; //rng_.Gaussian(angle, CONFIG_init_r_sigma);
     particle.weight = 1/((double)particles_.size());
