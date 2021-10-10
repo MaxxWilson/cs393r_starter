@@ -55,6 +55,8 @@ CONFIG_FLOAT(k1, "k1");
 CONFIG_FLOAT(k2, "k2");
 CONFIG_FLOAT(k3, "k3");
 CONFIG_FLOAT(k4, "k4");
+CONFIG_FLOAT(k5, "k5");
+CONFIG_FLOAT(k6, "k6");
 
 CONFIG_FLOAT(laser_offset, "laser_offset");
 
@@ -70,7 +72,6 @@ CONFIG_DOUBLE(resize_factor, "resize_factor");
 CONFIG_INT(resample_frequency, "resample_frequency");
 
 namespace particle_filter {
-  bool new_first_odom;
   Vector2f first_odom_loc;
   float first_odom_angle;
 
@@ -289,22 +290,20 @@ void ParticleFilter::Predict(const Vector2f& odom_loc,
   // float arc_dist = r * odom_angle;
 
   auto R_odom = Eigen::Rotation2D<float>(-prev_odom_angle_).toRotationMatrix();
-  // Eigen::Vector2f del_T_base = R_odom * (odom_loc - prev_odom_loc_);
-  Eigen::Vector2f del_T = (odom_loc - prev_odom_loc_);
+  Eigen::Vector2f del_T_base = R_odom * (odom_loc - prev_odom_loc_);
 
-  Eigen::Vector2f zero;
-  zero << (0, 0);
-  if(!del_T.isApprox(zero))
-    std::cout<<"del_T: " << del_T << "\n";
+  // Eigen::Vector2f zero;
+  // zero << (0, 0);
+  // if(!del_T.isApprox(zero))
+  //   std::cout<<"del_T: " << del_T << "\n";
 
   for(Particle &particle: particles_){
 
     auto R_map = Eigen::Rotation2D<float>(particle.angle).toRotationMatrix();
 
-
-    //float sigma_x = CONFIG_k1 * del_T_base.norm() + CONFIG_k2 * abs(math_util::AngleDiff(odom_angle, prev_odom_angle_)); // x and y
-    //float sigma_y = CONFIG_k1 * del_T_base.norm() + CONFIG_k2 * abs(math_util::AngleDiff(odom_angle, prev_odom_angle_));
-    //float sigma_tht = CONFIG_k3 * del_T_base.norm() + CONFIG_k4 * abs(math_util::AngleDiff(odom_angle, prev_odom_angle_)); // tht
+    // float sigma_x = CONFIG_k1 * del_T_base.norm() + CONFIG_k2 * abs(math_util::AngleDiff(odom_angle, prev_odom_angle_)); // x and y
+    // float sigma_y = CONFIG_k1 * del_T_base.norm() + CONFIG_k2 * abs(math_util::AngleDiff(odom_angle, prev_odom_angle_));
+    // float sigma_tht = CONFIG_k3 * del_T_base.norm() + CONFIG_k4 * abs(math_util::AngleDiff(odom_angle, prev_odom_angle_)); // tht
 
     // float e_x = rng_.Gaussian(0.0, sigma_x);
     // float e_y = rng_.Gaussian(0.0, sigma_y);
@@ -312,19 +311,21 @@ void ParticleFilter::Predict(const Vector2f& odom_loc,
 
     // particle.loc += R_map * del_T_base + Eigen::Vector2f(e_x, e_y);
     // particle.angle += odom_angle - prev_odom_angle_ + e_tht;
-
-    float sigma_x = k1 * del_T[0];
-    float sigma_y = k2 * del_T[1];
-    float sigma_tht = k3 * (math_util::AngleDiff(odom_angle, prev_odom_angle_));
-    
-    Eigen::Vector2f e_xy;
-    e_xy << ((float) rng_.Gaussian(0.0, sigma_x),(float) rng_.Gaussian(0.0, sigma_y));
+    float sigma_tht = CONFIG_k5 * del_T_base.norm() + CONFIG_k6 * abs(math_util::AngleDiff(odom_angle, prev_odom_angle_));
     float e_tht = rng_.Gaussian(0.0, sigma_tht);
+    float adj_tht = math_util::AngleDiff(odom_angle, prev_odom_angle_) + e_tht;
+    auto R_b2 = Eigen::Rotation2D<float>(adj_tht).toRotationMatrix();
 
-    Eigen::Vector2f est_del_T = R_odom * (del_T + e_xy);
+    float sigma_x = CONFIG_k1 * del_T_base.norm() + CONFIG_k2 * abs(math_util::AngleDiff(odom_angle, prev_odom_angle_));;
+    float sigma_y = CONFIG_k3 * del_T_base.norm() + CONFIG_k4 * abs(math_util::AngleDiff(odom_angle, prev_odom_angle_));
+
+    
+    Eigen::Vector2f e_xy = Eigen::Vector2f((float) rng_.Gaussian(0.0, sigma_x),(float) rng_.Gaussian(0.0, sigma_y));
+
+    Eigen::Vector2f est_del_T = del_T_base + (R_b2 * e_xy); // in previous base_link
     particle.loc += R_map * est_del_T;   
 
-    particle.angle += odom_angle - prev_odom_angle_ + e_tht;        
+    particle.angle += adj_tht;        
   }
 
   prev_odom_loc_[0] = odom_loc[0];
@@ -360,7 +361,6 @@ void ParticleFilter::Initialize(const string& map_file,
   }
   max_weight_log_ = 0;
   last_update_loc_ = prev_odom_loc_;
-  new_first_odom = true;
   map_.Load(map_file);
 }
 
