@@ -50,8 +50,24 @@ CONFIG_INT(num_particles, "num_particles");
 CONFIG_FLOAT(init_x_sigma, "init_x_sigma");
 CONFIG_FLOAT(init_y_sigma, "init_y_sigma");
 CONFIG_FLOAT(init_r_sigma, "init_r_sigma");
-DEFINE_double(num_particles, 50, "Number of particles");
+
+CONFIG_FLOAT(k1, "k1");
+CONFIG_FLOAT(k2, "k2");
+CONFIG_FLOAT(k3, "k3");
+CONFIG_FLOAT(k4, "k4");
+
 CONFIG_FLOAT(laser_offset, "laser_offset");
+
+CONFIG_FLOAT(min_dist_to_update, "min_dist_to_update");
+CONFIG_DOUBLE(sigma_observation, "sigma_observation");
+CONFIG_DOUBLE(gamma, "gamma");
+CONFIG_DOUBLE(dist_short, "dist_short");
+CONFIG_DOUBLE(dist_long, "dist_long");
+CONFIG_DOUBLE(range_min, "range_min");
+CONFIG_DOUBLE(range_max, "range_max");
+
+CONFIG_DOUBLE(resize_factor, "resize_factor");
+CONFIG_INT(resample_frequency, "resample_frequency");
 
 namespace particle_filter {
   bool new_first_odom;
@@ -85,20 +101,22 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
   // This is NOT the motion model predict step: it is the prediction of the
   // expected observations, to be used for the update step.
 
-  // Note: The returned values must be set using the `scan` variable:
+  // Note: The returned values must be set using the `scan` variable:=
+
+  scan.resize((int)(num_ranges / CONFIG_resize_factor));
   
-  scan.resize((int)(num_ranges / resize_factor));
-  
+  Vector2f sensor_loc = BaseLinkToSensorFrame(loc, angle);
+
   // Fill in the entries of scan using array writes, e.g. scan[i] = ...
   for (size_t i = 0; i < scan.size(); ++i) { // for each ray
     // Initialize the ray line
     line2f ray(0, 1, 2, 3);
-    float ray_angle = angle + angle_min + resize_factor * i / num_ranges * (angle_max - angle_min);
-    ray.p0[0] = loc[0] + range_min * cos(ray_angle);
-    ray.p0[1] = loc[1] + range_min * sin(ray_angle);
-    ray.p1[0] = loc[0] + range_max * cos(ray_angle);
-    ray.p1[1] = loc[1] + range_max * sin(ray_angle);
-    Vector2f final_intersection = loc + range_max * Vector2f(cos(ray_angle), sin(ray_angle));
+    float ray_angle = angle + angle_min + CONFIG_resize_factor * i / num_ranges * (angle_max - angle_min);
+    ray.p0[0] = sensor_loc[0] + range_min * cos(ray_angle);
+    ray.p0[1] = sensor_loc[1] + range_min * sin(ray_angle);
+    ray.p1[0] = sensor_loc[0] + range_max * cos(ray_angle);
+    ray.p1[1] = sensor_loc[1] + range_max * sin(ray_angle);
+    Vector2f final_intersection = sensor_loc + range_max * Vector2f(cos(ray_angle), sin(ray_angle));
     double min_dist = range_max;
     
     for (size_t i = 0; i < map_.lines.size(); ++i) { // for each line in map
@@ -106,7 +124,7 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
       Vector2f intersection_point; // Return variable
       bool intersects = map_line.Intersection(ray, &intersection_point);
       if (intersects) {
-        double cur_dist = (intersection_point - loc).norm();
+        double cur_dist = (intersection_point - sensor_loc).norm();
         if(cur_dist < min_dist) {
           final_intersection = intersection_point;
           min_dist = cur_dist;
@@ -120,6 +138,22 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
   
 }
 
+double GetRobustObservationLikelihood(double measured, double expected, double dist_short, double dist_long){
+  
+  if(measured < CONFIG_range_min || measured > CONFIG_range_max){
+
+  }
+  else if(measured < (expected - dist_short)){
+    return dist_short;
+  }
+  else if(measured > (expected + dist_long)){
+    return dist_long;
+  }
+  else{
+    return measured - expected;
+  }
+}
+
 // Yuhong
 // Update the weight of the particle based on how well it fits the observation
 void ParticleFilter::Update(const vector<float>& ranges,
@@ -130,9 +164,8 @@ void ParticleFilter::Update(const vector<float>& ranges,
                             Particle* p_ptr) {
   // Get predicted point cloud
   Particle &particle = *p_ptr;
-  vector<Vector2f> predicted_cloud;
-  Vector2f sensor_loc = BaseLinkToSensorFrame(particle.loc, particle.angle);
-  GetPredictedPointCloud(sensor_loc, 
+  vector<Vector2f> predicted_cloud; // map frame
+  GetPredictedPointCloud(particle.loc, 
                          particle.angle, 
                          ranges.size(), 
                          range_min, 
@@ -140,34 +173,26 @@ void ParticleFilter::Update(const vector<float>& ranges,
                          angle_min,
                          angle_max,
                          &predicted_cloud);
+  Vector2f sensor_loc = BaseLinkToSensorFrame(particle.loc, particle.angle);
   // resize the ranges
   vector<float> trimmed_ranges(predicted_cloud.size());
-  for(int i = 0; i < predicted_cloud.size(); i++) {
-    trimmed_ranges[i] = ranges[i * resize_factor];
+  for(std::size_t i = 0; i < predicted_cloud.size(); i++) {
+    trimmed_ranges[i] = ranges[i * CONFIG_resize_factor];
   }
-  float log_error = 0;
+  double log_error = 0;
   // Calculate the particle weight
-  for(int i = 0; i < predicted_cloud.size(); i++) {
-    // Observation likelihood function, See Lecture 7, Slide 30
-    // 1) Center gaussian on predicted range
-    // 2) Evaluate gaussian at actual range to get likelihood
-    // 3) Multiply all scan likelihoods together for total particle weight
-    // *Note* Use log-likelihood to maintain precision
-    float predicted_range = (predicted_cloud[i] - sensor_loc).norm();
-    float diff = abs(trimmed_ranges[i] - predicted_range);
-    log_error += std::pow(-Sq(diff) / vairance, gamma); // smaller the diff, larger the particle weight
+  for(std::size_t i = 0; i < predicted_cloud.size(); i++) {
+    double predicted_range = (predicted_cloud[i] - sensor_loc).norm();
+    //double diff = GetRobustObservationLikelihood(trimmed_ranges[i], predicted_range, CONFIG_dist_short, CONFIG_dist_long);
+    double diff = trimmed_ranges[i] - predicted_range;
+    log_error += -CONFIG_gamma * Sq(diff) / Sq(CONFIG_sigma_observation);
 
   }
-  particle.weight = 0;
   particle.weight = log_error;
 }
 
 // Maxx
 void ParticleFilter::Resample() {
-  // Resample the particles, proportional to their weights.
-  // The current particles are in the `particles_` variable. 
-  // Create a variable to store the new particles, and when done, replace the
-  // old set of particles:
   vector<Particle> new_particles(particles_.size());
   vector<double> weight_bins(particles_.size());
   
@@ -193,24 +218,16 @@ void ParticleFilter::Resample() {
 // Maxx
 void ParticleFilter::LowVarianceResample() {
   vector<Particle> new_particles(particles_.size());
-  vector<double> weight_bins(particles_.size());
-  
-  // Calculate weight sum, get bins sized by particle weights as vector
-  double weight_sum = 0;
-  for(std::size_t i = 0; i < particles_.size(); i++){
-    //std::cout << i << ": " << particles_[i].loc[0] << ", " << particles_[i].loc[1] << std::endl;
-    weight_sum += particles_[i].weight;
-    weight_bins[i] = weight_sum;
-  }
 
-  double select_weight = rng_.UniformRandom(0, weight_sum);
+  double select_weight = rng_.UniformRandom(0, weight_sum_);
 
   for(std::size_t i = 0; i < particles_.size(); i++){
-    auto new_particle_index = std::lower_bound(weight_bins.begin(), weight_bins.end(), select_weight) - weight_bins.begin();
-    select_weight = std::fmod(select_weight + weight_sum/((double) particles_.size()), weight_sum);
+    int new_particle_index = std::lower_bound(weight_bins_.begin(), weight_bins_.end(), select_weight) - weight_bins_.begin();
+    select_weight = std::fmod(select_weight + weight_sum_/((double) particles_.size()), weight_sum_);
     new_particles[i] = particles_[new_particle_index];
     new_particles[i].weight = 1/((double) particles_.size()); // rng_.UniformRandom(); good for testing
   }
+  weight_sum_ = 1.0;
   
   // After resampling:
   particles_ = new_particles;
@@ -227,8 +244,34 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
                                   float angle_max) {
   // A new laser scan observation is available (in the laser frame)
   // Call the Update and Resample steps as necessary.
-  
-  //LowVarianceResample();
+  if((last_update_loc_ - prev_odom_loc_).norm() > CONFIG_min_dist_to_update){
+
+    max_weight_log_ = -1e10; // Should be smaller than any
+    weight_sum_ = 0;
+    weight_bins_.resize(particles_.size());
+    std::fill(weight_bins_.begin(), weight_bins_.end(), 0);
+
+    // Update each particle with log error weight and find largest weight (smallest negative number)
+    for(Particle &p: particles_){
+      Update(ranges, range_min, range_max, angle_min, angle_max, &p);
+      max_weight_log_ = std::max(max_weight_log_, p.weight);
+    }
+
+    // cout << endl << endl;
+    // Normalize log-likelihood weights by max log weight and transform back to linear scale
+    // Sum all linear weights and generate bins
+    for(std::size_t i = 0; i < particles_.size(); i++){
+      particles_[i].weight = exp(particles_[i].weight - max_weight_log_);
+      weight_sum_ += particles_[i].weight;
+      weight_bins_[i] = weight_sum_;
+    }
+
+    if(!(resample_loop_counter_ % CONFIG_resample_frequency)){
+      LowVarianceResample();
+    }
+    last_update_loc_ = prev_odom_loc_;
+    resample_loop_counter_++;       
+  }                      
 }
 
 // Melissa
@@ -236,6 +279,14 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
 //described in lect 9/15
 void ParticleFilter::Predict(const Vector2f& odom_loc,
                              const float odom_angle) {
+  // Implement the predict step of the particle filter here.
+  // A new odometry value is available (in the odom frame)
+  // Implement the motion model predict step here, to propagate the particles
+  // forward based on odometry.
+
+  // float d = sqrt(pow(odom_loc[0],2) + pow(odom_loc[1],2));
+  // float r = d / (2*sin(odom_angle));
+  // float arc_dist = r * odom_angle;
 
   auto R_odom = Eigen::Rotation2D<float>(-prev_odom_angle_).toRotationMatrix();
   // Eigen::Vector2f del_T_base = R_odom * (odom_loc - prev_odom_loc_);
@@ -246,14 +297,14 @@ void ParticleFilter::Predict(const Vector2f& odom_loc,
   if(!del_T.isApprox(zero))
     std::cout<<"del_T: " << del_T << "\n";
 
-  float k1 = 0.5; float k2 = 0.5; float k3 = 0.5; float k4 = 0.0;
   for(Particle &particle: particles_){
 
     auto R_map = Eigen::Rotation2D<float>(particle.angle).toRotationMatrix();
 
-    // float sigma_x = k1 * del_T_base.norm() + k2 * abs(math_util::AngleDiff(odom_angle, prev_odom_angle_)); // x and y
-    // float sigma_y = k1 * del_T_base.norm() + k2 * abs(math_util::AngleDiff(odom_angle, prev_odom_angle_));
-    // float sigma_tht = k3 * del_T_base.norm() + k4 * abs(math_util::AngleDiff(odom_angle, prev_odom_angle_)); // tht
+
+    //float sigma_x = CONFIG_k1 * del_T_base.norm() + CONFIG_k2 * abs(math_util::AngleDiff(odom_angle, prev_odom_angle_)); // x and y
+    //float sigma_y = CONFIG_k1 * del_T_base.norm() + CONFIG_k2 * abs(math_util::AngleDiff(odom_angle, prev_odom_angle_));
+    //float sigma_tht = CONFIG_k3 * del_T_base.norm() + CONFIG_k4 * abs(math_util::AngleDiff(odom_angle, prev_odom_angle_)); // tht
 
     // float e_x = rng_.Gaussian(0.0, sigma_x);
     // float e_y = rng_.Gaussian(0.0, sigma_y);
@@ -287,8 +338,6 @@ void ParticleFilter::Predict(const Vector2f& odom_loc,
 void TransformToMap(const Vector2f& odom_loc,
                      const float odom_angle){
       
-
-
 }
 
 // Maxx
@@ -309,6 +358,8 @@ void ParticleFilter::Initialize(const string& map_file,
     particle.angle = angle; //rng_.Gaussian(angle, CONFIG_init_r_sigma);
     particle.weight = 1/((double)particles_.size());
   }
+  max_weight_log_ = 0;
+  last_update_loc_ = prev_odom_loc_;
   new_first_odom = true;
   map_.Load(map_file);
 }
@@ -321,17 +372,14 @@ void ParticleFilter::GetLocation(Eigen::Vector2f* loc_ptr,
   // of particles. The computed values must be set to the `loc` and `angle`
   // variables to return them. Modify the following assignments:
 
-  double weight_sum = 0;
-  double angle_x_sum = 0;
   Eigen::Vector2f angle_point = Eigen::Vector2f(0, 0);
   for(Particle particle: particles_){
     loc += particle.loc * particle.weight;
     angle_point += Eigen::Vector2f(cos(particle.angle), sin(particle.angle)) * particle.weight;
-    weight_sum += particle.weight;
   }
 
-  loc /= weight_sum;
-  angle_point /= weight_sum;
+  loc /= weight_sum_;
+  angle_point /= weight_sum_;
   angle = atan2(angle_point[1], angle_point[0]);
 }
 
