@@ -138,21 +138,23 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
     if(v_dir > 0){ // search up
       v_search_index += 1;
     }
+
+    int test = 0;
     
     Vector2f final_intersection_x = sensor_loc + range_max * Vector2f(cos(ray_angle), sin(ray_angle));
     float curr_dist_x = 0;
     while(!ray.Intersection(vertical_lines_[h_search_index], &final_intersection_x) && curr_dist_x < abs(ray.p1.x() - ray.p0.x()) && h_search_index >= 0 && h_search_index < vertical_lines_.size() ){ // vertical search
       curr_dist_x = abs(vertical_lines_[h_search_index].p0.x() - ray.p0.x());
       h_search_index += h_dir;
+      test++;
     }
-
     float curr_dist_y = 0;
     Vector2f final_intersection_y = sensor_loc + range_max * Vector2f(cos(ray_angle), sin(ray_angle));
     while(!ray.Intersection(horizontal_lines_[v_search_index], &final_intersection_y) && curr_dist_y < abs((ray.p1.y() - ray.p0.y())) && v_search_index >= 0 && v_search_index < horizontal_lines_.size() ){ // vertical search
       curr_dist_y = abs(horizontal_lines_[v_search_index].p0.y() - ray.p0.y());
       v_search_index += v_dir;
+      test++;
     }
-
     float curr_dist_angled = range_max;
     Vector2f final_intersection_angled = sensor_loc + range_max * Vector2f(cos(ray_angle), sin(ray_angle));
     for (size_t i = 0; i < angled_lines_.size(); ++i) { // for each line in map
@@ -162,6 +164,8 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
           curr_dist_angled = new_dist;
         }
       }
+      test++;
+      
     }
 
     if((final_intersection_x - ray.p0).norm() < (final_intersection - ray.p0).norm()){
@@ -202,7 +206,6 @@ void ParticleFilter::Update(const vector<float>& ranges,
                             float angle_min,
                             float angle_max,
                             Particle* p_ptr) {
-  double start = GetMonotonicTime();
   
   // Get predicted point cloud
   Particle &particle = *p_ptr;
@@ -228,7 +231,6 @@ void ParticleFilter::Update(const vector<float>& ranges,
     double diff = GetRobustObservationLikelihood(trimmed_ranges[i], predicted_range, CONFIG_dist_short, CONFIG_dist_long);
     particle.weight += -CONFIG_gamma * Sq(diff) / Sq(CONFIG_sigma_observation);
   } 
-  double end = GetMonotonicTime();
   //std::cout << "Update Particle (ms): " << 1000*(end - start) << std::endl;
 }
 
@@ -287,7 +289,6 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
   // Call the Update and Resample steps as necessary.
   if((last_update_loc_ - prev_odom_loc_).norm() > CONFIG_min_dist_to_update){
     double start_time = GetMonotonicTime();
-
     max_weight_log_ = -1e10; // Should be smaller than any
     weight_sum_ = 0;
     weight_bins_.resize(particles_.size());
@@ -311,10 +312,10 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
       LowVarianceResample();
     }
     last_update_loc_ = prev_odom_loc_;
-    resample_loop_counter_++;       
+    resample_loop_counter_++;
 
     double end_time = GetMonotonicTime();
-    std::cout << "Loop Time: " << 1000*(end_time - start_time) << std::endl; 
+    std::cout << "First: " << 1000*(end_time - start_time) << std::endl;
   }                     
 }
 
@@ -409,6 +410,9 @@ bool ParticleFilter::vertical_line_compare(const geometry::line2f l1, const geom
 
 void ParticleFilter::SortMap(){
    // Split lines in map into horizontal, vertical, and angled
+  horizontal_lines_.clear();
+  vertical_lines_.clear();
+  
   for (size_t i = 0; i < map_.lines.size(); ++i) {
       const geometry::line2f line = map_.lines[i];
       if(line.p0.y() == line.p1.y()){
@@ -425,9 +429,10 @@ void ParticleFilter::SortMap(){
   std::sort(horizontal_lines_.begin(), horizontal_lines_.end(), horizontal_line_compare);
   std::sort(vertical_lines_.begin(), vertical_lines_.end(), vertical_line_compare);
 
-  // for(geometry::line2f line: vertical_lines_){
-  //   cout << line.p0.x() << endl;
-  // }
+  cout << "Sizes" << endl;
+  cout << horizontal_lines_.size() << endl;
+  cout << vertical_lines_.size() << endl;
+  cout << angled_lines_.size() << endl;
 }
 
 void ParticleFilter::GetLocation(Eigen::Vector2f* loc_ptr, 
