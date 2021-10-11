@@ -103,40 +103,81 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
   // expected observations, to be used for the update step.
 
   // Note: The returned values must be set using the `scan` variable:=
-
   scan.resize((int)(num_ranges / CONFIG_resize_factor));
   
   Vector2f sensor_loc = BaseLinkToSensorFrame(loc, angle);
+  
+  int v_start_index = std::lower_bound(horizontal_lines_.begin(), horizontal_lines_.end(), line2f(sensor_loc, sensor_loc), horizontal_line_compare) - horizontal_lines_.begin();
+  int h_start_index = std::lower_bound(vertical_lines_.begin(), vertical_lines_.end(), line2f(sensor_loc, sensor_loc), vertical_line_compare) - vertical_lines_.begin();
 
   // Fill in the entries of scan using array writes, e.g. scan[i] = ...
   for (size_t i = 0; i < scan.size(); ++i) { // for each ray
     // Initialize the ray line
     line2f ray(0, 1, 2, 3);
     float ray_angle = angle + angle_min + CONFIG_resize_factor * i / num_ranges * (angle_max - angle_min);
-    ray.p0[0] = sensor_loc[0] + range_min * cos(ray_angle);
-    ray.p0[1] = sensor_loc[1] + range_min * sin(ray_angle);
+    ray.p0 = sensor_loc;
     ray.p1[0] = sensor_loc[0] + range_max * cos(ray_angle);
     ray.p1[1] = sensor_loc[1] + range_max * sin(ray_angle);
     Vector2f final_intersection = sensor_loc + range_max * Vector2f(cos(ray_angle), sin(ray_angle));
     double min_dist = range_max;
-    
-    for (size_t i = 0; i < map_.lines.size(); ++i) { // for each line in map
-      const line2f map_line = map_.lines[i];
-      Vector2f intersection_point; // Return variable
-      bool intersects = map_line.Intersection(ray, &intersection_point);
-      if (intersects) {
-        double cur_dist = (intersection_point - sensor_loc).norm();
-        if(cur_dist < min_dist) {
-          final_intersection = intersection_point;
-          min_dist = cur_dist;
-        }
-      }
+
+    // Return if no map is loaded
+    if(!vertical_lines_.size() || !horizontal_lines_.size()){
+      return;
     }
+
+    int h_dir = math_util::Sign(ray.Dir().x());
+    int v_dir = math_util::Sign(ray.Dir().y());
+
+    int v_search_index = v_start_index;
+    int h_search_index = h_start_index;
+
+    if(h_dir < 0){ // search right
+      h_search_index += 1;
+    }
+
+    if(v_dir > 0){ // search up
+      v_search_index += 1;
+    }
+    
+    Vector2f final_intersection_x = sensor_loc + range_max * Vector2f(cos(ray_angle), sin(ray_angle));
+    float curr_dist_x = 0;
+    while(!ray.Intersection(vertical_lines_[h_search_index], &final_intersection_x) && curr_dist_x < abs(ray.p1.x() - ray.p0.x()) && h_search_index >= 0 && h_search_index < vertical_lines_.size() ){ // vertical search
+      curr_dist_x = abs(vertical_lines_[h_search_index].p0.x() - ray.p0.x());
+      h_search_index += h_dir;
+    }
+
+    float curr_dist_y = 0;
+    Vector2f final_intersection_y = sensor_loc + range_max * Vector2f(cos(ray_angle), sin(ray_angle));
+    while(!ray.Intersection(horizontal_lines_[v_search_index], &final_intersection_y) && curr_dist_y < abs((ray.p1.y() - ray.p0.y())) && v_search_index >= 0 && v_search_index < horizontal_lines_.size() ){ // vertical search
+      curr_dist_y = abs(horizontal_lines_[v_search_index].p0.y() - ray.p0.y());
+      v_search_index += v_dir;
+    }
+
+    if((final_intersection_x - ray.p0).norm() > (final_intersection_y - ray.p0).norm()){
+      final_intersection = final_intersection_y;
+    }
+    else{
+      final_intersection = final_intersection_x;
+    }
+
+    // bool intersection_found = false;
+
+    // while(!intersection_found){
+    // if(){ // next horizontal is closer than next vertical
+
+
+    // }
+    // else{
+
+    // }
+
+    // }
+
+    //cout << "Final Intersection: " << final_intersection.x() << ", " << final_intersection.y() << endl;
 
     scan[i] = final_intersection;
   }
-
-  
 }
 
 double GetRobustObservationLikelihood(double measured, double expected, double dist_short, double dist_long){
@@ -163,9 +204,12 @@ void ParticleFilter::Update(const vector<float>& ranges,
                             float angle_min,
                             float angle_max,
                             Particle* p_ptr) {
+  double start = GetMonotonicTime();
+  
   // Get predicted point cloud
   Particle &particle = *p_ptr;
   vector<Vector2f> predicted_cloud; // map frame
+
   GetPredictedPointCloud(particle.loc, 
                          particle.angle, 
                          ranges.size(), 
@@ -177,19 +221,17 @@ void ParticleFilter::Update(const vector<float>& ranges,
   Vector2f sensor_loc = BaseLinkToSensorFrame(particle.loc, particle.angle);
   // resize the ranges
   vector<float> trimmed_ranges(predicted_cloud.size());
-  for(std::size_t i = 0; i < predicted_cloud.size(); i++) {
-    trimmed_ranges[i] = ranges[i * CONFIG_resize_factor];
-  }
-  double log_error = 0;
+  particle.weight = 0;
+
   // Calculate the particle weight
   for(std::size_t i = 0; i < predicted_cloud.size(); i++) {
+    trimmed_ranges[i] = ranges[i * CONFIG_resize_factor];
     double predicted_range = (predicted_cloud[i] - sensor_loc).norm();
     double diff = GetRobustObservationLikelihood(trimmed_ranges[i], predicted_range, CONFIG_dist_short, CONFIG_dist_long);
-    //double diff = trimmed_ranges[i] - predicted_range;
-    log_error += -CONFIG_gamma * Sq(diff) / Sq(CONFIG_sigma_observation);
-
-  }
-  particle.weight = log_error;
+    particle.weight += -CONFIG_gamma * Sq(diff) / Sq(CONFIG_sigma_observation);
+  } 
+  double end = GetMonotonicTime();
+  //std::cout << "Update Particle (ms): " << 1000*(end - start) << std::endl;
 }
 
 // Maxx
@@ -246,6 +288,7 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
   // A new laser scan observation is available (in the laser frame)
   // Call the Update and Resample steps as necessary.
   if((last_update_loc_ - prev_odom_loc_).norm() > CONFIG_min_dist_to_update){
+    double start_time = GetMonotonicTime();
 
     max_weight_log_ = -1e10; // Should be smaller than any
     weight_sum_ = 0;
@@ -258,7 +301,6 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
       max_weight_log_ = std::max(max_weight_log_, p.weight);
     }
 
-    // cout << endl << endl;
     // Normalize log-likelihood weights by max log weight and transform back to linear scale
     // Sum all linear weights and generate bins
     for(std::size_t i = 0; i < particles_.size(); i++){
@@ -272,7 +314,10 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
     }
     last_update_loc_ = prev_odom_loc_;
     resample_loop_counter_++;       
-  }                      
+
+    double end_time = GetMonotonicTime();
+    std::cout << "Loop Time: " << 1000*(end_time - start_time) << std::endl << std::endl; 
+  }                     
 }
 
 // Melissa
@@ -353,6 +398,38 @@ void ParticleFilter::Initialize(const string& map_file,
   last_update_loc_ = prev_odom_loc_;
   //first_odom_flag = true; // TODO kill me
   map_.Load(map_file);
+  SortMap();
+}
+
+bool ParticleFilter::horizontal_line_compare(const geometry::line2f l1, const geometry::line2f l2){
+  return l1.p0.y() < l2.p0.y();
+}
+
+bool ParticleFilter::vertical_line_compare(const geometry::line2f l1, const geometry::line2f l2){
+  return l1.p0.x() < l2.p0.x();
+}
+
+void ParticleFilter::SortMap(){
+   // Split lines in map into horizontal, vertical, and angled
+  for (size_t i = 0; i < map_.lines.size(); ++i) {
+      const geometry::line2f line = map_.lines[i];
+      if(line.p0.y() == line.p1.y()){
+        horizontal_lines_.push_back(line);
+      }
+      else if(line.p0.x() == line.p1.x()){
+        vertical_lines_.push_back(line);
+      }
+      else{
+        angled_lines_.push_back(line);
+      }
+  }
+  // Sort horizontal and vertical in ascending order
+  std::sort(horizontal_lines_.begin(), horizontal_lines_.end(), horizontal_line_compare);
+  std::sort(vertical_lines_.begin(), vertical_lines_.end(), vertical_line_compare);
+
+  // for(geometry::line2f line: vertical_lines_){
+  //   cout << line.p0.x() << endl;
+  // }
 }
 
 void ParticleFilter::GetLocation(Eigen::Vector2f* loc_ptr, 

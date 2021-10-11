@@ -80,6 +80,10 @@ class ParticleFilter {
 
   void LowVarianceResample();
 
+  void SortMap();
+  static bool horizontal_line_compare(const geometry::line2f l1, const geometry::line2f l2);
+  static bool vertical_line_compare(const geometry::line2f l1, const geometry::line2f l2);
+
   // For debugging: get predicted point cloud from current location.
   void GetPredictedPointCloud(const Eigen::Vector2f& loc,
                               const float angle,
@@ -101,6 +105,9 @@ class ParticleFilter {
 
   // Map of the environment.
   vector_map::VectorMap map_;
+  std::vector<geometry::line2f> horizontal_lines_;
+  std::vector<geometry::line2f> vertical_lines_;
+  std::vector<geometry::line2f> angled_lines_;
 
   // Random number generator.
   util_random::Random rng_;
