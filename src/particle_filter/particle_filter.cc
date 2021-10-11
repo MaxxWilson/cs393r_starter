@@ -119,7 +119,6 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
     ray.p1[0] = sensor_loc[0] + range_max * cos(ray_angle);
     ray.p1[1] = sensor_loc[1] + range_max * sin(ray_angle);
     Vector2f final_intersection = sensor_loc + range_max * Vector2f(cos(ray_angle), sin(ray_angle));
-    double min_dist = range_max;
 
     // Return if no map is loaded
     if(!vertical_lines_.size() || !horizontal_lines_.size()){
@@ -154,27 +153,26 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
       v_search_index += v_dir;
     }
 
-    if((final_intersection_x - ray.p0).norm() > (final_intersection_y - ray.p0).norm()){
-      final_intersection = final_intersection_y;
+    float curr_dist_angled = range_max;
+    Vector2f final_intersection_angled = sensor_loc + range_max * Vector2f(cos(ray_angle), sin(ray_angle));
+    for (size_t i = 0; i < angled_lines_.size(); ++i) { // for each line in map
+      if(ray.Intersection(angled_lines_[i], &final_intersection_angled)){ // if there is a collision
+        float new_dist = (final_intersection_angled - ray.p0).norm();
+        if(new_dist < curr_dist_angled){
+          curr_dist_angled = new_dist;
+        }
+      }
     }
-    else{
+
+    if((final_intersection_x - ray.p0).norm() < (final_intersection - ray.p0).norm()){
       final_intersection = final_intersection_x;
     }
-
-    // bool intersection_found = false;
-
-    // while(!intersection_found){
-    // if(){ // next horizontal is closer than next vertical
-
-
-    // }
-    // else{
-
-    // }
-
-    // }
-
-    //cout << "Final Intersection: " << final_intersection.x() << ", " << final_intersection.y() << endl;
+    if((final_intersection_y - ray.p0).norm() < (final_intersection - ray.p0).norm()){
+      final_intersection = final_intersection_y;
+    }
+    if((final_intersection_angled - ray.p0).norm() < (final_intersection - ray.p0).norm()){
+      final_intersection = final_intersection_angled;
+    }
 
     scan[i] = final_intersection;
   }
@@ -316,7 +314,7 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
     resample_loop_counter_++;       
 
     double end_time = GetMonotonicTime();
-    std::cout << "Loop Time: " << 1000*(end_time - start_time) << std::endl << std::endl; 
+    std::cout << "Loop Time: " << 1000*(end_time - start_time) << std::endl; 
   }                     
 }
 
