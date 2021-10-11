@@ -287,6 +287,18 @@ void ParticleFilter::Predict(const Vector2f& odom_loc,
   // float r = d / (2*sin(odom_angle));
   // float arc_dist = r * odom_angle;
 
+  // if(first_odom_flag){
+  //   first_odom_flag = false;
+  //   first_odom_loc = odom_loc;
+  //   first_odom_angle = odom_angle;
+  // }
+
+  // auto odom_loc_diff = odom_loc - first_odom_loc;
+  // auto odom_angle_diff = odom_angle - first_odom_angle;
+
+  //std::cout << "Location: " << odom_loc_diff.norm() << std::endl;
+  //std::cout << "Angle: " << odom_angle_diff << std::endl;
+
   // rotation matrix from last odom to last baselink
   auto rot_odom1_to_bl1 = Eigen::Rotation2D<float>(-prev_odom_angle_).toRotationMatrix();
   
@@ -334,11 +346,12 @@ void ParticleFilter::Initialize(const string& map_file,
       loc[0] + rng_.Gaussian(0, CONFIG_init_x_sigma),
       loc[1] + rng_.Gaussian(0, CONFIG_init_y_sigma)
       );
-    particle.angle = angle; //rng_.Gaussian(angle, CONFIG_init_r_sigma);
+    particle.angle = angle + rng_.Gaussian(0, CONFIG_init_r_sigma);
     particle.weight = 1/((double)particles_.size());
   }
   max_weight_log_ = 0;
   last_update_loc_ = prev_odom_loc_;
+  //first_odom_flag = true; // TODO kill me
   map_.Load(map_file);
 }
 

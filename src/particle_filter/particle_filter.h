@@ -109,6 +109,10 @@ class ParticleFilter {
   Eigen::Vector2f prev_odom_loc_;
   float prev_odom_angle_;
   bool odom_initialized_;
+
+  // Eigen::Vector2f first_odom_loc;
+  // float first_odom_angle;
+  // bool first_odom_flag = true;
   
   std::vector<double> weight_bins_;
   double max_weight_log_ = 0;

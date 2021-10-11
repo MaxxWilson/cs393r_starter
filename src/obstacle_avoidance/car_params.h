@@ -42,7 +42,7 @@ const float min_curvature = -1.0;
 // Dynamics
 const float max_acceleration = 6.0;
 const float min_acceleration = -6.0;
-const float max_velocity = 2.0;
+const float max_velocity = 1.25;
 
 
 // Algorithmic Parameters

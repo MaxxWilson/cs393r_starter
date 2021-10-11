@@ -145,6 +145,8 @@ class Navigation {
   // Navigation goal angle.
   float nav_goal_angle_;
 
+  bool first_cycle = true;
+
   void TransformPointCloud(TimeShiftedTF transform);
 };
 
