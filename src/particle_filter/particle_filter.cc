@@ -86,7 +86,6 @@ void ParticleFilter::GetParticles(vector<Particle>* particles) const {
   *particles = particles_;
 }
 
-// Yuhong
 void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
                                             const float angle,
                                             int num_ranges,
@@ -99,10 +98,6 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
   // Compute what the predicted point cloud would be, if the car was at the pose
   // loc, angle, with the sensor characteristics defined by the provided
   // parameters.
-  // This is NOT the motion model predict step: it is the prediction of the
-  // expected observations, to be used for the update step.
-
-  // Note: The returned values must be set using the `scan` variable:=
   scan.resize((int)(num_ranges / CONFIG_resize_factor));
   
   Vector2f sensor_loc = BaseLinkToSensorFrame(loc, angle);
@@ -131,41 +126,35 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
     int v_search_index = v_start_index;
     int h_search_index = h_start_index;
 
-    if(h_dir < 0){ // search right
+    if(h_dir < 0){
       h_search_index += 1;
     }
 
-    if(v_dir > 0){ // search up
+    if(v_dir > 0){
       v_search_index += 1;
     }
-
-    int test = 0;
     
     Vector2f final_intersection_x = sensor_loc + range_max * Vector2f(cos(ray_angle), sin(ray_angle));
     float curr_dist_x = 0;
     while(!ray.Intersection(vertical_lines_[h_search_index], &final_intersection_x) && curr_dist_x < abs(ray.p1.x() - ray.p0.x()) && h_search_index >= 0 && h_search_index < vertical_lines_.size() ){ // vertical search
       curr_dist_x = abs(vertical_lines_[h_search_index].p0.x() - ray.p0.x());
       h_search_index += h_dir;
-      test++;
     }
     float curr_dist_y = 0;
     Vector2f final_intersection_y = sensor_loc + range_max * Vector2f(cos(ray_angle), sin(ray_angle));
     while(!ray.Intersection(horizontal_lines_[v_search_index], &final_intersection_y) && curr_dist_y < abs((ray.p1.y() - ray.p0.y())) && v_search_index >= 0 && v_search_index < horizontal_lines_.size() ){ // vertical search
       curr_dist_y = abs(horizontal_lines_[v_search_index].p0.y() - ray.p0.y());
       v_search_index += v_dir;
-      test++;
     }
     float curr_dist_angled = range_max;
     Vector2f final_intersection_angled = sensor_loc + range_max * Vector2f(cos(ray_angle), sin(ray_angle));
-    for (size_t i = 0; i < angled_lines_.size(); ++i) { // for each line in map
-      if(ray.Intersection(angled_lines_[i], &final_intersection_angled)){ // if there is a collision
+    for (size_t i = 0; i < angled_lines_.size(); ++i) {
+      if(ray.Intersection(angled_lines_[i], &final_intersection_angled)){
         float new_dist = (final_intersection_angled - ray.p0).norm();
         if(new_dist < curr_dist_angled){
           curr_dist_angled = new_dist;
         }
-      }
-      test++;
-      
+      }     
     }
 
     if((final_intersection_x - ray.p0).norm() < (final_intersection - ray.p0).norm()){
@@ -198,7 +187,6 @@ double GetRobustObservationLikelihood(double measured, double expected, double d
   }
 }
 
-// Yuhong
 // Update the weight of the particle based on how well it fits the observation
 void ParticleFilter::Update(const vector<float>& ranges,
                             float range_min,
@@ -231,10 +219,8 @@ void ParticleFilter::Update(const vector<float>& ranges,
     double diff = GetRobustObservationLikelihood(trimmed_ranges[i], predicted_range, CONFIG_dist_short, CONFIG_dist_long);
     particle.weight += -CONFIG_gamma * Sq(diff) / Sq(CONFIG_sigma_observation);
   } 
-  //std::cout << "Update Particle (ms): " << 1000*(end - start) << std::endl;
 }
 
-// Maxx
 void ParticleFilter::Resample() {
   vector<Particle> new_particles(particles_.size());
   vector<double> weight_bins(particles_.size());
@@ -258,7 +244,6 @@ void ParticleFilter::Resample() {
   particles_ = new_particles;
 }
 
-// Maxx
 void ParticleFilter::LowVarianceResample() {
   vector<Particle> new_particles(particles_.size());
 
@@ -288,7 +273,7 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
   // A new laser scan observation is available (in the laser frame)
   // Call the Update and Resample steps as necessary.
   if((last_update_loc_ - prev_odom_loc_).norm() > CONFIG_min_dist_to_update){
-    double start_time = GetMonotonicTime();
+    //double start_time = GetMonotonicTime();
     max_weight_log_ = -1e10; // Should be smaller than any
     weight_sum_ = 0;
     weight_bins_.resize(particles_.size());
@@ -314,34 +299,15 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
     last_update_loc_ = prev_odom_loc_;
     resample_loop_counter_++;
 
-    double end_time = GetMonotonicTime();
-    std::cout << "First: " << 1000*(end_time - start_time) << std::endl;
+    // double end_time = GetMonotonicTime();
+    // std::cout << "First: " << 1000*(end_time - start_time) << std::endl;
   }                     
 }
 
-// Melissa
-//TODO: empirically determine ks - drive the car and eval errors, 
-//described in lect 9/15
 void ParticleFilter::Predict(const Vector2f& odom_loc,
                              const float odom_angle) {
   // A new odometry value is available (in the odom frame)
   // propagate particles forward based on odometry.
-
-  // float d = sqrt(pow(odom_loc[0],2) + pow(odom_loc[1],2));
-  // float r = d / (2*sin(odom_angle));
-  // float arc_dist = r * odom_angle;
-
-  // if(first_odom_flag){
-  //   first_odom_flag = false;
-  //   first_odom_loc = odom_loc;
-  //   first_odom_angle = odom_angle;
-  // }
-
-  // auto odom_loc_diff = odom_loc - first_odom_loc;
-  // auto odom_angle_diff = odom_angle - first_odom_angle;
-
-  //std::cout << "Location: " << odom_loc_diff.norm() << std::endl;
-  //std::cout << "Angle: " << odom_angle_diff << std::endl;
 
   // rotation matrix from last odom to last baselink
   auto rot_odom1_to_bl1 = Eigen::Rotation2D<float>(-prev_odom_angle_).toRotationMatrix();
@@ -376,13 +342,11 @@ void ParticleFilter::Predict(const Vector2f& odom_loc,
   prev_odom_angle_ = odom_angle;
 }
 
-// Maxx
 void ParticleFilter::Initialize(const string& map_file,
                                 const Vector2f& loc,
                                 const float angle) {
   // The "set_pose" button on the GUI was clicked, or an initialization message
-  // was received from the log. Initialize the particles accordingly, e.g. with
-  // some distribution around the provided location and angle.
+  // was received from the log.
 
   particles_.resize(CONFIG_num_particles);
 
@@ -396,7 +360,6 @@ void ParticleFilter::Initialize(const string& map_file,
   }
   max_weight_log_ = 0;
   last_update_loc_ = prev_odom_loc_;
-  //first_odom_flag = true; // TODO kill me
   map_.Load(map_file);
   SortMap();
 }
@@ -413,6 +376,7 @@ void ParticleFilter::SortMap(){
    // Split lines in map into horizontal, vertical, and angled
   horizontal_lines_.clear();
   vertical_lines_.clear();
+  angled_lines_.clear();
   
   for (size_t i = 0; i < map_.lines.size(); ++i) {
       const geometry::line2f line = map_.lines[i];
@@ -429,11 +393,6 @@ void ParticleFilter::SortMap(){
   // Sort horizontal and vertical in ascending order
   std::sort(horizontal_lines_.begin(), horizontal_lines_.end(), horizontal_line_compare);
   std::sort(vertical_lines_.begin(), vertical_lines_.end(), vertical_line_compare);
-
-  cout << "Sizes" << endl;
-  cout << horizontal_lines_.size() << endl;
-  cout << vertical_lines_.size() << endl;
-  cout << angled_lines_.size() << endl;
 }
 
 void ParticleFilter::GetLocation(Eigen::Vector2f* loc_ptr, 
@@ -441,8 +400,7 @@ void ParticleFilter::GetLocation(Eigen::Vector2f* loc_ptr,
   Vector2f& loc = *loc_ptr;
   float& angle = *angle_ptr;
   // Compute the best estimate of the robot's location based on the current set
-  // of particles. The computed values must be set to the `loc` and `angle`
-  // variables to return them. Modify the following assignments:
+  // of particles.
 
   Eigen::Vector2f angle_point = Eigen::Vector2f(0, 0);
   for(Particle particle: particles_){
@@ -460,25 +418,3 @@ Eigen::Vector2f ParticleFilter::BaseLinkToSensorFrame(const Eigen::Vector2f &loc
 }
 
 }  // namespace particle_filter
-
-///// Team Plan /////
-// Predict (Melissa)
-//    Given point and odometry msg, propogate point cloud forward
-// Update (Yuhong)
-//    predicted expected observation for a particle given map 
-//    Compare observation with prediction
-//    Assign weight to particle (Importance Weights?)
-//    Note: Only update after car has travelled a certain distance?
-// Resample (Maxx)
-//    Given a set of weighted particles, resample probabilistically
-//    Low-variance resampling
-//    resample less often (every N updates)
-//    TODO: Importance Sampling
-
-// RECOMMENDED IMPLEMENTATION (Observation Likelihood Model)
-// 1) start with simple observation likelihood model, pure gaussian (Log Likelihood?)
-// 2) Test in simulator
-// 3) Tune standard deviation, gamma, to prevent overconfident estimates
-//
-// 4) Next, implement robust piece-wise observation likelihood model
-// 5) Tune params with logged data
