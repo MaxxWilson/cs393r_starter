@@ -361,13 +361,14 @@ void ParticleFilter::Predict(const Vector2f& odom_loc,
     Eigen::Vector2f e_xy = Eigen::Vector2f((float) rng_.Gaussian(0.0, sigma_x),(float) rng_.Gaussian(0.0, sigma_y));
 
     // Transform noise to Base Link 1 using estimated angle to get noisy translation
-    auto rot_b1_to_b2 = Eigen::Rotation2D<float>(noisy_angle).toRotationMatrix();
-    Eigen::Vector2f noisy_translation = delta_translation + rot_b1_to_b2 * e_xy; // in previous base_link
+    auto rot_b2_to_b1 = Eigen::Rotation2D<float>(delta_angle).toRotationMatrix();
+    Eigen::Vector2f noisy_translation = delta_translation + rot_b2_to_b1 * e_xy; // in previous base_link
     
     // Transform noise to map using current particle angle
     auto rot_bl1_to_map = Eigen::Rotation2D<float>(particle.angle).toRotationMatrix();
     particle.loc += rot_bl1_to_map * noisy_translation;   
     particle.angle += noisy_angle;        
+    cout << noisy_angle - delta_angle << endl;
   }
 
   // Update previous odometry
