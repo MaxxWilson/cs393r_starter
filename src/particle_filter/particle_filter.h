@@ -27,6 +27,7 @@
 #include "shared/math/line2d.h"
 #include "shared/util/random.h"
 #include "vector_map/vector_map.h"
+#include "visualization/visualization.h"
 
 #ifndef SRC_PARTICLE_FILTER_H_
 #define SRC_PARTICLE_FILTER_H_
@@ -77,6 +78,12 @@ class ParticleFilter {
   // Resample particles.
   void Resample();
 
+  void LowVarianceResample();
+
+  void SortMap();
+  static bool horizontal_line_compare(const geometry::line2f l1, const geometry::line2f l2);
+  static bool vertical_line_compare(const geometry::line2f l1, const geometry::line2f l2);
+
   // For debugging: get predicted point cloud from current location.
   void GetPredictedPointCloud(const Eigen::Vector2f& loc,
                               const float angle,
@@ -87,6 +94,10 @@ class ParticleFilter {
                               float angle_max,
                               std::vector<Eigen::Vector2f>* scan);
 
+  void SetParticlesForTesting(std::vector<Particle> new_particles);
+
+ Eigen::Vector2f BaseLinkToSensorFrame(const Eigen::Vector2f &loc, const float &angle);
+
  private:
 
   // List of particles being tracked.
@@ -94,6 +105,9 @@ class ParticleFilter {
 
   // Map of the environment.
   vector_map::VectorMap map_;
+  std::vector<geometry::line2f> horizontal_lines_;
+  std::vector<geometry::line2f> vertical_lines_;
+  std::vector<geometry::line2f> angled_lines_;
 
   // Random number generator.
   util_random::Random rng_;
@@ -102,6 +116,17 @@ class ParticleFilter {
   Eigen::Vector2f prev_odom_loc_;
   float prev_odom_angle_;
   bool odom_initialized_;
+
+  // Eigen::Vector2f first_odom_loc;
+  // float first_odom_angle;
+  // bool first_odom_flag = true;
+  
+  std::vector<double> weight_bins_;
+  double max_weight_log_ = 0;
+  double weight_sum_ = 0;
+
+  Eigen::Vector2f last_update_loc_;
+  int resample_loop_counter_ = 0;
 };
 }  // namespace slam
 
