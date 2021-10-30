@@ -72,6 +72,10 @@ DEFINE_string(odom_topic, "/odom", "Name of ROS topic for odometry data");
 
 DECLARE_int32(v);
 
+// Create config reader entries
+// CONFIG_STRING(test, "test");
+config_reader::ConfigReader config_reader_({"config/slam.lua"});
+
 bool run_ = true;
 slam::SLAM slam_;
 ros::Publisher visualization_publisher_;

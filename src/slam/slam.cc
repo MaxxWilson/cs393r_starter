@@ -30,6 +30,7 @@
 #include "shared/math/math_util.h"
 #include "shared/util/timer.h"
 
+#include "config_reader/config_reader.h"
 #include "slam.h"
 
 #include "vector_map/vector_map.h"
@@ -46,6 +47,9 @@ using std::string;
 using std::swap;
 using std::vector;
 using vector_map::VectorMap;
+
+
+//CONFIG_INT(test, "test");
 
 namespace slam {
 
@@ -68,6 +72,38 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
   // A new laser scan has been observed. Decide whether to add it as a pose
   // for SLAM. If decided to add, align it to the scan from the last saved pose,
   // and save both the scan and the optimized pose.
+
+  // Pseudocode:
+  /*
+  if(odom_from_last_pose larger than 0.5m or 30 deg){
+
+    double P = 0.0;
+    Pose T = Pose(0, 0, 0);
+
+    for(all dtheta){
+      Convert scan to XY points relative to base link (including tf from lidar->BL)
+      for(each dx){
+        for(each dy){
+          double newP = 0.0;
+          // For each |XY point in scan, get log likelihood from CSM
+          for(each point){
+            double newP += getLikelihoodCSM(dtheta, dx + point.x, dy + point.y);
+          }
+          convert log likelihood newP to normalalized likelihood
+          compute motion model likelihood
+          if(P < newP*motionP){
+            P = newP*motionP;
+            T = Pose(dx, dy, dtheta)
+          }
+        }
+      }
+    }
+
+    updateCSM(scan)l
+    Poses.add(T + Poses(Poses.end));
+    odom_sum = Pose(0, 0, 0);
+  }
+  */
 }
 
 void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
