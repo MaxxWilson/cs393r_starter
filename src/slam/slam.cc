@@ -49,7 +49,8 @@ using std::vector;
 using vector_map::VectorMap;
 
 
-//CONFIG_INT(test, "test");
+CONFIG_FLOAT(dist_update_thresh, "dist_update_thresh");
+CONFIG_FLOAT(angle_update_thresh, "angle_update_thresh");
 
 namespace slam {
 
@@ -60,8 +61,8 @@ SLAM::SLAM() :
 
 void SLAM::GetPose(Eigen::Vector2f* loc, float* angle) const {
   // Return the latest pose estimate of the robot.
-  *loc = Vector2f(0, 0);
-  *angle = 0;
+  *loc = curr_odom_loc_;
+  *angle = curr_odom_angle_;
 }
 
 void SLAM::ObserveLaser(const vector<float>& ranges,
@@ -75,7 +76,7 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
 
   // Pseudocode:
   /*
-  if(odom_from_last_pose larger than 0.5m or 30 deg){
+  if(curr_odom_loc_.norm() > CONFIG_dist_update_thresh || abs(curr_odom_angle_) > CONFIG_angle_update_thresh){
 
     double P = 0.0;
     Pose T = Pose(0, 0, 0);
@@ -89,8 +90,10 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
           for(each point){
             double newP += getLikelihoodCSM(dtheta, dx + point.x, dy + point.y);
           }
-          convert log likelihood newP to normalalized likelihood
+          convert log likelihood newP to normalized likelihood
           compute motion model likelihood
+
+          // Update most likely transform
           if(P < newP*motionP){
             P = newP*motionP;
             T = Pose(dx, dy, dtheta)
@@ -99,22 +102,26 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
       }
     }
 
-    updateCSM(scan)l
+    updateCSM(scan)
     Poses.add(T + Poses(Poses.end));
     odom_sum = Pose(0, 0, 0);
-  }
-  */
+  } */
 }
 
 void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
   if (!odom_initialized_) {
-    prev_odom_angle_ = odom_angle;
+    curr_odom_loc_ = odom_loc;
+    curr_odom_angle_ = odom_angle;
+
     prev_odom_loc_ = odom_loc;
+    prev_odom_angle_ = odom_angle;
+
     odom_initialized_ = true;
     return;
   }
-  // Keep track of odometry to estimate how far the robot has moved between 
-  // poses.
+
+  curr_odom_loc_ += odom_loc;
+  curr_odom_angle_ += odom_angle;
 }
 
 vector<Vector2f> SLAM::GetMap() {

@@ -30,6 +30,38 @@
 
 namespace slam {
 
+struct Pose{
+  double x;
+  double y;
+  double theta;
+
+  Pose(){
+    this->x = 0.0;
+    this->y = 0.0;
+    this->theta = 0.0;
+  }
+
+  Pose(double x, double y, double theta){
+    this->x = x;
+    this->y = y;
+    this->theta = theta;
+  }
+
+  Pose(const Pose &p){
+    this->x = p.x;
+    this->y = p.y;
+    this->theta = p.theta;
+  }
+
+  Pose operator +(Pose p){
+    Pose newPose(*this);
+    newPose.x += p.x;
+    newPose.y += p.y;
+    newPose.theta += p.theta;
+    return newPose;
+  }
+};
+
 class SLAM {
  public:
   // Default Constructor.
@@ -54,10 +86,18 @@ class SLAM {
 
  private:
 
-  // Previous odometry-reported locations.
+  // Current odometry
+  Eigen::Vector2f curr_odom_loc_;
+  float curr_odom_angle_;
+
+  // Odometry at last Pose update
   Eigen::Vector2f prev_odom_loc_;
   float prev_odom_angle_;
+  
   bool odom_initialized_;
+
+  std::vector<Pose> poses;
+
 };
 }  // namespace slam
 
