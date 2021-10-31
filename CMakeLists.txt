@@ -43,6 +43,7 @@ INCLUDE_DIRECTORIES(src/shared)
 INCLUDE_DIRECTORIES(src)
 
 ROSBUILD_ADD_EXECUTABLE(slam
+                        src/slam/cost_map.cc
                         src/slam/slam_main.cc
                         src/slam/slam.cc)
 TARGET_LINK_LIBRARIES(slam shared_library ${libs})
