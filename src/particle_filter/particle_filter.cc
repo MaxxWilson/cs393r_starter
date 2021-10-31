@@ -123,8 +123,8 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
     int h_dir = math_util::Sign(ray.Dir().x());
     int v_dir = math_util::Sign(ray.Dir().y());
 
-    int v_search_index = v_start_index;
-    int h_search_index = h_start_index;
+    uint64_t v_search_index = v_start_index;
+    uint64_t h_search_index = h_start_index;
 
     if(h_dir < 0){
       h_search_index += 1;
@@ -136,13 +136,13 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
     
     Vector2f final_intersection_x = sensor_loc + range_max * Vector2f(cos(ray_angle), sin(ray_angle));
     float curr_dist_x = 0;
-    while(!ray.Intersection(vertical_lines_[h_search_index], &final_intersection_x) && curr_dist_x < abs(ray.p1.x() - ray.p0.x()) && h_search_index >= 0 && h_search_index < vertical_lines_.size() ){ // vertical search
+    while(!ray.Intersection(vertical_lines_[h_search_index], &final_intersection_x) && curr_dist_x < abs(ray.p1.x() - ray.p0.x()) && h_search_index < vertical_lines_.size() ){ // vertical search
       curr_dist_x = abs(vertical_lines_[h_search_index].p0.x() - ray.p0.x());
       h_search_index += h_dir;
     }
     float curr_dist_y = 0;
     Vector2f final_intersection_y = sensor_loc + range_max * Vector2f(cos(ray_angle), sin(ray_angle));
-    while(!ray.Intersection(horizontal_lines_[v_search_index], &final_intersection_y) && curr_dist_y < abs((ray.p1.y() - ray.p0.y())) && v_search_index >= 0 && v_search_index < horizontal_lines_.size() ){ // vertical search
+    while(!ray.Intersection(horizontal_lines_[v_search_index], &final_intersection_y) && curr_dist_y < abs((ray.p1.y() - ray.p0.y())) && v_search_index < horizontal_lines_.size() ){ // vertical search
       curr_dist_y = abs(horizontal_lines_[v_search_index].p0.y() - ray.p0.y());
       v_search_index += v_dir;
     }
