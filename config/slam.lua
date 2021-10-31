@@ -3,7 +3,7 @@ dist_update_thresh = 0.5
 angle_update_thresh = 0.5236 -- 30°
 
 -- CSM Search --
-dist_res = 0.1 -- 10 cm
+dist_res = 0.05 -- 10 cm
 theta_res = 0.01 -- ~0.5°
 
 -- Vehicle Constants --
@@ -18,10 +18,10 @@ k3 = 0.3    -- rotation error from translation
 k4 = 0.5    -- rotation error from rotation
 
 -- Observation Model --
-gamma = 0.2
-sigma_observation = 0.2
+gamma = 1.0
+sigma_observation = 0.5 -- 0.2
 
 -- Map Resize --
 map_size = 10000
-map_length_dist = dist_update_thresh + range_max + laser_offset
-row_num = 2*(dist_update_thresh + range_max + laser_offset)/dist_res + 1
+map_length_dist = dist_update_thresh + range_max + laser_offset + 4*sigma_observation + 5.0
+row_num = 2*(map_length_dist)/dist_res + 1

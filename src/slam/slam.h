@@ -69,6 +69,7 @@ class SLAM {
   float prev_odom_angle_;
   
   bool odom_initialized_;
+  bool cost_map_initialized;
 
   std::vector<pose_2d::Pose2D<float>> poses;
 

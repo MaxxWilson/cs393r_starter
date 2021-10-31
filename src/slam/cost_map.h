@@ -33,15 +33,18 @@ class CostMap{
     public:
         CostMap();
 
+        //Used to compute normalized log likelihood lookup values from rasterized cost table
+        double max_likelihood;
+
+        //Updates rasterized cost table given a new laser scan  
         void UpdateMap(const vector<float>& ranges, float range_min,
                 float range_max, float angle_min, float angle_max, float angle_increment);
 
-        void SetLogLikelihoodAtPosition(double x, double y, float log_likelihood);
-        double GetLogLikelihoodAtPosition(double x, double y);
+        void SetLikelihoodAtPosition(double x, double y, double log_likelihood);
+        double GetLikelihoodAtPosition(double x, double y);
         int GetIndexFromDist(double dist);
         float RoundToResolution(float value);
-
-        double max_weight_log_;
+        void ClearMap();
     private:
         //int row_num = 2*(CONFIG_dist_update_thresh + CONFIG_range_max + CONFIG_laser_offset)/CONFIG_dist_res + 1;
         vector<vector<double>> cost_map_vector;
