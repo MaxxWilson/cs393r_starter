@@ -23,6 +23,8 @@
 #include "shared/math/math_util.h"
 #include "cost_map.h"
 #include "shared/math/statistics.h"
+#include "eigen3/Eigen/Dense"
+#include "eigen3/Eigen/Geometry"
 
 namespace costmap{
 
@@ -40,18 +42,28 @@ CostMap::CostMap(): cost_map_vector(CONFIG_row_num, vector<double>(CONFIG_row_nu
 }
 
 void CostMap::UpdateMap(const vector<float>& ranges, float range_min,
-                float range_max, float angle_min, float angle_max){
+                float range_max, float angle_min, float angle_max, float angle_increment){
     // Given a scan, clear the lookup table and calculate new lookup table
 
-    float sum_dist; //summation of all pdfs
+    float pdf_max = 3 * CONFIG_sigma_observation / CONFIG_dist_res;
+    for(std::size_t i = 0; i < ranges.size(); i++){
+        // Polar to Cartesian conversion
+        float angle = angle_min + angle_increment*i;
+        float x = ranges[i]*cos(angle) + 0.2;
+        float y = ranges[i]*sin(angle);
+        for(int row = 0; row < pdf_max * 2 + 1; row+= CONFIG_dist_res){
+            for(int col = 0; col < pdf_max * 2 + 1; col+= CONFIG_dist_res){
+                float log_liklihood = -math_util::Sq((Eigen::Vector2f(x,y) - Eigen::Vector2f(pdf_max + row, pdf_max + col)).norm()) / (2 * math_util::Sq(CONFIG_sigma_observation));
+                SetLogLikelihoodAtPosition(x - pdf_max + row, y- pdf_max + col, log_liklihood);
+            }   
+        }
+    }
+}
 
-    // for(std::size_t i = 0; i < ranges.size(); i++){
-    //     float pdf_at_landmark = math_util::Pow((-math_util::Sq(0 - ranges[i]) / (2 * math_util::Sq(CONFIG_sigma_observation))), (int) CONFIG_gamma);
-    //     
-    // }
-    /*
-        
-    */
+void CostMap::SetLogLikelihoodAtPosition(double x, double y, float log_likelihood){
+    int xIdx = GetIndexFromDist(x);
+    int yIdx = GetIndexFromDist(y);
+    cost_map_vector[xIdx][yIdx] = log_likelihood;
 }
 
 double CostMap::GetLogLikelihoodAtPosition(double x, double y){

@@ -33,12 +33,10 @@ class CostMap{
     public:
         CostMap();
 
-        void UpdateMap(const vector<float>& ranges,
-                        float range_min,
-                        float range_max,
-                        float angle_min,
-                        float angle_max);
+        void UpdateMap(const vector<float>& ranges, float range_min,
+                float range_max, float angle_min, float angle_max, float angle_increment);
 
+        void SetLogLikelihoodAtPosition(double x, double y, float log_likelihood);
         double GetLogLikelihoodAtPosition(double x, double y);
         int GetIndexFromDist(double dist);
         float RoundToResolution(float value);
