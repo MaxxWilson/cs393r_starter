@@ -137,7 +137,7 @@ void Navigation::TimeOptimalControl(const PathOption& path) {
     drive_msg_.curvature = path.curvature;
     drive_msg_.velocity = set_speed;
 
-    std::cout << path.free_path_length << std::endl;
+    //std::cout << path.free_path_length << std::endl;
 
     drive_pub_.publish(drive_msg_);
     //TODO: record the commands used for latency compensation
@@ -263,7 +263,7 @@ void Navigation::Run(){
   //obstacle_avoidance::VisualizeObstacleAvoidanceInfo(goal_point,path_options,best_path,local_viz_msg_);
   
   // 7) Publish commands with 1-D TOC, update vector of previous vehicle commands
-  TimeOptimalControl(best_path);
+  //TimeOptimalControl(best_path);
 
     // static double start_timer;
     // if(first_cycle){
@@ -276,8 +276,8 @@ void Navigation::Run(){
     // // Remove for obstacle avoidance
     // std::cout << "Curr Time: " << GetMonotonicTime() << std::endl;
     // if(GetMonotonicTime() < start_timer + 1.0){
-    //   drive_msg_.curvature = 0.0;
-    //   drive_msg_.velocity = 1.0;
+    drive_msg_.curvature = 0.0;
+    drive_msg_.velocity = 1.0;
     // }
     // else{
     //   drive_msg_.curvature = 0.0;

@@ -74,6 +74,8 @@ class SLAM {
   bool odom_initialized_;
   bool cost_map_initialized;
 
+  std::vector<Eigen::Vector2f> cloud_;
+
   std::vector<pose_2d::Pose2D<float>> poses;
 
   double GetMotionModelLikelihood(double x, double y, double theta);
