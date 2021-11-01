@@ -67,6 +67,9 @@ class SLAM {
   // Odometry at last Pose update
   Eigen::Vector2f prev_odom_loc_;
   float prev_odom_angle_;
+
+  pose_2d::Pose2D<float> previous_pose_;
+  pose_2d::Pose2D<float> current_pose_;
   
   bool odom_initialized_;
   bool cost_map_initialized;
@@ -74,13 +77,7 @@ class SLAM {
   std::vector<pose_2d::Pose2D<float>> poses;
 
   double GetMotionModelLikelihood(double x, double y, double theta);
-  void BuildMapFromScan(const vector<float>& ranges,
-                      float range_min,
-                      float range_max,
-                      float angle_min,
-                      float angle_max,
-                      float angle_increment,
-                      const pose_2d::Pose2D<float> MLE_pose);
+  void BuildMapFromScan(const vector<Eigen::Vector2f>& cloud, const pose_2d::Pose2D<float> MLE_pose);
   
 };
 }  // namespace slam

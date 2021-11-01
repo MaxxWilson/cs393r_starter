@@ -44,47 +44,42 @@ CostMap::CostMap(): cost_map_vector(CONFIG_row_num, vector<double>(CONFIG_row_nu
 }
 
 // Given a scan, clear the lookup table and calculate new lookup table gaussian distribution values
-void CostMap::UpdateMap(const vector<float>& ranges, float range_min,
-                float range_max, float angle_min, float angle_max, float angle_increment){
+void CostMap::UpdateMap(const std::vector<Eigen::Vector2f> &cloud){
     ClearMap();
 
     // For square kernel of odd size, length / 2 - 1, EX. 5x5 -> 2, 17x17 -> 8
     // Size Kernel based on Std of sensor measurement, where past 3 sigma probabilty falls off to zero
-    int kernel_half_width = 3 * CONFIG_sigma_observation / CONFIG_dist_res;
+    int kernel_half_width = 4 * CONFIG_sigma_observation / CONFIG_dist_res;
 
     // Iterate through rays in scan
-    for(std::size_t i = 0; i < ranges.size(); i++){
-        if(ranges[i] < CONFIG_range_max){
-            // Convert scans from polar to cartesian
-            float angle = angle_min + angle_increment*i;
-            float x = ranges[i]*cos(angle) + CONFIG_laser_offset;
-            float y = ranges[i]*sin(angle);
+    for(std::size_t i = 0; i < cloud.size(); i++){
+        auto x = cloud[i].x();
+        auto y = cloud[i].y();
 
-            // Apply Gaussian Kernel to Scan point
-            for(int row = -kernel_half_width; row <= kernel_half_width; row++){
-                for(int col = -kernel_half_width; col <= kernel_half_width; col++){
-                    // Get the position of bin corresponding to scan point
-                    Eigen::Vector2f scan_point_bin(RoundToResolution(x), RoundToResolution(y));
-                    
-                    // Get current bin location based on scan point as reference
-                    Eigen::Vector2f curr_position = scan_point_bin + Eigen::Vector2f(col, row) * CONFIG_dist_res;
-                    
-                    // Add bin likelihood using distance from mean
-                    double dist_from_scan_point = (scan_point_bin - curr_position).norm();
-                    // double log_likelihood = -Sq(dist_from_scan_point) / Sq(CONFIG_sigma_observation);
+        // Apply Gaussian Kernel to Scan point
+        for(int row = -kernel_half_width; row <= kernel_half_width; row++){
+            for(int col = -kernel_half_width; col <= kernel_half_width; col++){
+                // Get the position of bin corresponding to scan point
+                Eigen::Vector2f scan_point_bin(RoundToResolution(x), RoundToResolution(y));
+                
+                // Get current bin location based on scan point as reference
+                Eigen::Vector2f curr_position = scan_point_bin + Eigen::Vector2f(col, row) * CONFIG_dist_res;
+                
+                // Add bin likelihood using distance from mean
+                double dist_from_scan_point = (scan_point_bin - curr_position).norm();
+                // double log_likelihood = -Sq(dist_from_scan_point) / Sq(CONFIG_sigma_observation);
 
-                    //Calculate normal gaussian distribution to be put into cost map
-                    double gauss_dist = statistics::ProbabilityDensityGaussian(0.0, dist_from_scan_point, CONFIG_sigma_observation);
+                //Calculate normal gaussian distribution to be put into cost map
+                double gauss_dist = statistics::ProbabilityDensityGaussian(0.0, dist_from_scan_point, CONFIG_sigma_observation);
 
-                    double current_likelihood = cost_map_vector[GetIndexFromDist(curr_position.x())] [GetIndexFromDist(curr_position.y())];
-                    
-                    // Find largest guassian likelihood for normalization
-                    if(gauss_dist + current_likelihood > max_likelihood){
-                        max_likelihood = gauss_dist + current_likelihood;
-                    }
-                    SetLikelihoodAtPosition(curr_position.x(), curr_position.y(), gauss_dist + current_likelihood);
-                }   
-            }
+                double current_likelihood = cost_map_vector[GetIndexFromDist(curr_position.x())][GetIndexFromDist(curr_position.y())];
+                
+                // Find largest guassian likelihood for normalization
+                if(gauss_dist + current_likelihood > max_likelihood){
+                    max_likelihood = gauss_dist + current_likelihood;
+                }
+                SetLikelihoodAtPosition(curr_position.x(), curr_position.y(), gauss_dist + current_likelihood);
+            }   
         }
     }
 }
@@ -95,10 +90,10 @@ void CostMap::ClearMap(){
     }
 }
 
-void CostMap::SetLikelihoodAtPosition(double x, double y, double log_likelihood){
+void CostMap::SetLikelihoodAtPosition(double x, double y, double likelihood){
     int xIdx = GetIndexFromDist(x);
     int yIdx = GetIndexFromDist(y);
-    cost_map_vector[xIdx][yIdx] = log_likelihood;
+    cost_map_vector[xIdx][yIdx] = likelihood;
 }
 
 double CostMap::GetLikelihoodAtPosition(double x, double y){

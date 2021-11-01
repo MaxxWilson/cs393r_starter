@@ -19,6 +19,8 @@
 */
 //========================================================================
 
+#include "eigen3/Eigen/Dense"
+#include "eigen3/Eigen/Geometry"
 #include <vector>
 
 using std::vector;
@@ -37,10 +39,9 @@ class CostMap{
         double max_likelihood;
 
         //Updates rasterized cost table given a new laser scan  
-        void UpdateMap(const vector<float>& ranges, float range_min,
-                float range_max, float angle_min, float angle_max, float angle_increment);
+        void UpdateMap(const std::vector<Eigen::Vector2f> &cloud);
 
-        void SetLikelihoodAtPosition(double x, double y, double log_likelihood);
+        void SetLikelihoodAtPosition(double x, double y, double likelihood);
         double GetLikelihoodAtPosition(double x, double y);
         int GetIndexFromDist(double dist);
         float RoundToResolution(float value);
