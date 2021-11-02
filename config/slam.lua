@@ -3,7 +3,7 @@ dist_update_thresh = 0.3
 angle_update_thresh = 0.1 -- 30°
 
 -- CSM Search --
-dist_res = 0.03 -- 50 cm
+dist_res = 0.01 -- 50 cm
 theta_res = 0.005 -- ~5°
 
 -- Vehicle Constants --
@@ -20,7 +20,7 @@ k4 = 0.2 -- 0.2    -- rotation error from rotation
 -- Observation Model --
 gamma = 0.1
 sigma_observation = 0.2
-resize_factor = 100 -- Divides scan
+resize_factor = 900 -- Divides scan
 
 -- Map Resize --
 map_size = 10000

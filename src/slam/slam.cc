@@ -113,9 +113,18 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
     }
     std::cout << std::endl;
 
+    cloud_.resize(2);
+
+    cloud_[0] = Vector2f(0.54, -0.23);
+    cloud_[1] = Vector2f(0.56, -0.26);
+
     cost_map.UpdateMap(cloud_);
     BuildMapFromScan(cloud_, poses.back());
     cost_map_initialized = true;
+
+    Eigen::Rotation2Df R_NewPos2OldPos(0.01);
+    cloud_[0] = R_NewPos2OldPos*(Vector2f(0.54, -0.23) - Vector2f(-0.02, -0.01));
+    cloud_[1] = R_NewPos2OldPos*(Vector2f(0.56, -0.26) - Vector2f(-0.02, -0.01));
     return;
   }
   // Get odometry change since last pose update
@@ -163,19 +172,19 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
     //   cloud[i] = Vector2f(x, y);
     // }
 
-    theta_low = -1 * CONFIG_theta_res;
-    theta_high = 1 * CONFIG_theta_res;
-    translation_low = -1 * CONFIG_dist_res;
-    translation_high = 1 * CONFIG_dist_res;
+    theta_low = -2 * CONFIG_theta_res;
+    theta_high = 0 * CONFIG_theta_res;
+    translation_low = -2 * CONFIG_dist_res;
+    translation_high = 0 * CONFIG_dist_res;
     std::cout << "Num Theta: " << (theta_high - theta_low) / CONFIG_theta_res << std::endl;
     std::cout << "Num Dist: " << (translation_high - translation_low) / CONFIG_dist_res << std::endl;
     std::cout << "Odom Diff: " << odom_loc_diff.x() << ", " << odom_loc_diff.y() << ", " << odom_angle_diff << std::endl;
     // Iterate over possible change in theta
-    for(int angle_index = 0; angle_index < (theta_high - theta_low) / CONFIG_theta_res; angle_index++){
+    for(int angle_index = 0; angle_index <= (theta_high - theta_low) / CONFIG_theta_res; angle_index++){
       float dtheta = theta_low + angle_index * CONFIG_theta_res;
-      for(int x_index = 0; x_index < (translation_high - translation_low) / CONFIG_dist_res; x_index++){
+      for(int x_index = 0; x_index <= (translation_high - translation_low) / CONFIG_dist_res; x_index++){
         float dx = translation_low + x_index * CONFIG_dist_res;
-        for(int y_index = 0; y_index < (translation_high - translation_low) / CONFIG_dist_res; y_index++){
+        for(int y_index = 0; y_index <= (translation_high - translation_low) / CONFIG_dist_res; y_index++){
           float dy = translation_low + y_index * CONFIG_dist_res;
           //double start = GetMonotonicTime();
           
@@ -203,9 +212,7 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
           // double log_px = -Sq(trans_diff.x())/Sq(trans_sigma);
           // double log_py = -Sq(trans_diff.y())/Sq(trans_sigma);
           // double log_ptheta = -Sq(angle_diff)/Sq(angle_sigma);
-
-          std::cout << "P: " << pose_log_prob << std::endl;
-          std::cout << "dx, dy, dtheta: " << dx << ", " << dy << ", " << dtheta << std::endl << std::endl;
+          std::cout << "dtheta, dx, dy, P: " << dtheta << ", " << dx << ", " << dy << ", " << pose_log_prob << std::endl;
 
           // Update most likely transform
           if(P < pose_log_prob + log_px + log_py + log_ptheta){
