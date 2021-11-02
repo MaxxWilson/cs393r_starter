@@ -187,9 +187,13 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
           for(std::size_t i = 0; i < cloud.size(); i++){
               Vector2f point = cloud[i];
               Vector2f scanPos = R_NewPos2OldPos * point + trans_diff;
-              double gaussian_prob = cost_map.GetLikelihoodAtPosition(scanPos.x(), scanPos.y());
-              gaussian_prob = (gaussian_prob > 1e-50) ? gaussian_prob : 1e-50;
-              pose_log_prob += CONFIG_gamma*std::log(gaussian_prob);
+              try{
+                double gaussian_prob = cost_map.GetLikelihoodAtPosition(scanPos.x(), scanPos.y());
+                gaussian_prob = (gaussian_prob > 1e-50) ? gaussian_prob : 1e-50;
+                pose_log_prob += CONFIG_gamma*std::log(gaussian_prob);
+              } catch(std::out_of_range) {
+                continue;
+              }
           }
           
           // compute motion model likelihood
