@@ -71,14 +71,17 @@ void CostMap::UpdateMap(const std::vector<Eigen::Vector2f> &cloud){
 
                 //Calculate normal gaussian distribution to be put into cost map
                 double gauss_dist = statistics::ProbabilityDensityGaussian(0.0, dist_from_scan_point, CONFIG_sigma_observation);
-
-                double current_likelihood = cost_map_vector[GetIndexFromDist(curr_position.x())][GetIndexFromDist(curr_position.y())];
-                
-                // Find largest guassian likelihood for normalization
-                if(gauss_dist + current_likelihood > max_likelihood){
-                    max_likelihood = gauss_dist + current_likelihood;
+                try {
+                    // double current_likelihood = cost_map_vector[GetIndexFromDist(curr_position.x())][GetIndexFromDist(curr_position.y())];
+                    double current_likelihood = GetLikelihoodAtPosition(curr_position.x(), curr_position.y());
+                    // Find largest guassian likelihood for normalization
+                    if(gauss_dist + current_likelihood > max_likelihood){
+                        max_likelihood = gauss_dist + current_likelihood;
+                    }
+                    SetLikelihoodAtPosition(curr_position.x(), curr_position.y(), gauss_dist + current_likelihood);
+                } catch(std::out_of_range) {
+                    continue;
                 }
-                SetLikelihoodAtPosition(curr_position.x(), curr_position.y(), gauss_dist + current_likelihood);
             }   
         }
     }
@@ -93,12 +96,14 @@ void CostMap::ClearMap(){
 void CostMap::SetLikelihoodAtPosition(double x, double y, double likelihood){
     int xIdx = GetIndexFromDist(x);
     int yIdx = GetIndexFromDist(y);
+    if(xIdx < 0 || xIdx >= cost_map_vector.size() || yIdx < 0 || yIdx >= cost_map_vector[0].size()) throw std::out_of_range("Outof boundaries");
     cost_map_vector[xIdx][yIdx] = likelihood;
 }
 
 double CostMap::GetLikelihoodAtPosition(double x, double y){
     int xIdx = GetIndexFromDist(x);
     int yIdx = GetIndexFromDist(y);
+    if(xIdx < 0 || xIdx >= cost_map_vector.size() || yIdx < 0 || yIdx >= cost_map_vector[0].size()) throw std::out_of_range("Outof boundaries");
     return cost_map_vector[xIdx][yIdx] / max_likelihood; // returns normalized log likelihood
 }
 

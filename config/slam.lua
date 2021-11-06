@@ -12,6 +12,7 @@ range_min = 0.02
 range_max = 10.0
 
 -- Motion Model --
+
 k1 = 0.1 -- 0.1    -- translation error from translation
 k2 = 0.1 -- 0.1    -- translation error from rotation
 k3 = 0.05 -- 0.05    -- rotation error from translation

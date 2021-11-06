@@ -132,10 +132,15 @@ void Navigation::TimeOptimalControl(const PathOption& path) {
     //std::cout << "min stop: " << min_stop_distance << std::endl;
     
     //publish command to topic 
+    // drive_msg_.header.seq++;
+    // drive_msg_.header.stamp = ros::Time::now();
+    // drive_msg_.curvature = path.curvature;
+    // drive_msg_.velocity = set_speed;
+
     drive_msg_.header.seq++;
     drive_msg_.header.stamp = ros::Time::now();
-    drive_msg_.curvature = path.curvature;
-    drive_msg_.velocity = set_speed;
+    drive_msg_.curvature = 1;
+    drive_msg_.velocity = 1;
 
     //std::cout << path.free_path_length << std::endl;
 
