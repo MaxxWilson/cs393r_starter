@@ -49,7 +49,7 @@ void CostMap::UpdateMap(const std::vector<Eigen::Vector2f> &cloud){
 
     // For square kernel of odd size, length / 2 - 1, EX. 5x5 -> 2, 17x17 -> 8
     // Size Kernel based on Std of sensor measurement, where past 3 sigma probabilty falls off to zero
-    int kernel_half_width = 4 * CONFIG_sigma_observation / CONFIG_dist_res;
+    int kernel_half_width = 3 * CONFIG_sigma_observation / CONFIG_dist_res;
 
     // Iterate through rays in scan
     for(std::size_t i = 0; i < cloud.size(); i++){
