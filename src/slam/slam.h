@@ -80,7 +80,7 @@ class SLAM {
 
   double GetMotionModelLikelihood(double x, double y, double theta);
   void BuildMapFromScan(const vector<Eigen::Vector2f>& cloud, const pose_2d::Pose2D<float> MLE_pose);
-  
+  void DrawPoints(CImg<float> &image, std::vector<Eigen::Vector2f> &point_cloud);
 };
 }  // namespace slam
 
