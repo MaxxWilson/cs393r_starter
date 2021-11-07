@@ -140,13 +140,13 @@ double CostMap::GetLikelihoodAtPosition(double x, double y, bool normalized){
 }
 
 int CostMap::GetIndexFromDist(double dist){
-    float dist_rounded = RoundToResolution(dist);
-    float lower_bound = RoundToResolution(-(CONFIG_map_length_dist));
-    return (int) ((dist_rounded - lower_bound + CONFIG_dist_res/2) / CONFIG_dist_res); // integer round using CONFIG_dist_res/2
+    float dist_rounded = RoundToResolution(dist, CONFIG_dist_res);
+    float lower_bound = RoundToResolution(-(CONFIG_map_length_dist), CONFIG_dist_res);
+    return (int) RoundToResolution((dist_rounded - lower_bound) / CONFIG_dist_res, 1.0); // integer round using CONFIG_dist_res/2
 }
 
-float CostMap::RoundToResolution(float value){
-    return ((float) ((int) (value/CONFIG_dist_res + 0.5*math_util::Sign(value))))*CONFIG_dist_res;
+float CostMap::RoundToResolution(float value, float res){
+    return ((float) ((int) (value/res + 0.5*math_util::Sign(value))))*res;
 }
 
 } // namespace CostMap

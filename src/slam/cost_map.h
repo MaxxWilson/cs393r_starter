@@ -50,7 +50,7 @@ class CostMap{
         void SetLikelihoodAtPosition(double x, double y, double likelihood);
         double GetLikelihoodAtPosition(double x, double y, bool normalized = true);
         int GetIndexFromDist(double dist);
-        float RoundToResolution(float value);
+        float RoundToResolution(float value, float res);
         void ClearMap();
     private:
         //int row_num = 2*(CONFIG_dist_update_thresh + CONFIG_range_max + CONFIG_laser_offset)/CONFIG_dist_res + 1;

@@ -13,10 +13,10 @@ range_max = 8.0
 
 -- Motion Model --
 
-k1 = 0.05 -- 0.1    -- translation error from translation
-k2 = 1.0 -- 0.1    -- translation error from rotation
-k3 = 0.05 -- 0.05    -- rotation error from translation
-k4 = 0.05 -- 0.2    -- rotation error from rotation
+k1 = 0.1 --0.5 -- 0.1    -- translation error from translation
+k2 = 0.1 --1.0 -- 0.1    -- translation error from rotation
+k3 = 0.05 --0.1 -- 0.05    -- rotation error from translation
+k4 = 0.2 --0.5 -- 0.2    -- rotation error from rotation
 
 -- Observation Model --
 gamma = 0.001
