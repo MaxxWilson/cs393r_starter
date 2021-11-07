@@ -136,7 +136,12 @@ double CostMap::GetLikelihoodAtPosition(double x, double y, bool normalized){
     int xIdx = GetIndexFromDist(x);
     int yIdx = GetIndexFromDist(y);
     if(xIdx < 0 || xIdx >= cost_map_vector.size() || yIdx < 0 || yIdx >= cost_map_vector[0].size()) throw std::out_of_range("Out of boundaries");
-    return (normalized) ? cost_map_vector[xIdx][yIdx] / max_likelihood : cost_map_vector[xIdx][yIdx];
+    if(normalized){
+        return (cost_map_vector[xIdx][yIdx] / max_likelihood > 1e-4) ? cost_map_vector[xIdx][yIdx] / max_likelihood : 1e-5;
+    }
+    else{
+        return cost_map_vector[xIdx][yIdx];
+    }
 }
 
 int CostMap::GetIndexFromDist(double dist){
