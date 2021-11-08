@@ -70,6 +70,7 @@ class SLAM {
 
   pose_2d::Pose2D<float> previous_pose_;
   pose_2d::Pose2D<float> current_pose_;
+  float curr_dist_err = 0;
   
   bool odom_initialized_;
   bool cost_map_initialized;

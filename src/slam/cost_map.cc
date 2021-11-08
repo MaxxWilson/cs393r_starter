@@ -37,6 +37,7 @@ CONFIG_FLOAT(dist_res, "dist_res");
 CONFIG_DOUBLE(sigma_observation, "sigma_observation");
 CONFIG_DOUBLE(gamma, "gamma");
 CONFIG_INT(row_num, "row_num");
+CONFIG_FLOAT(cost_map_min_prob, "cost_map_min_prob");
 
 
 CostMap::CostMap(): cost_map_vector(CONFIG_row_num, vector<double>(CONFIG_row_num, 0.0)){
@@ -137,7 +138,7 @@ double CostMap::GetLikelihoodAtPosition(double x, double y, bool normalized){
     int yIdx = GetIndexFromDist(y);
     if(xIdx < 0 || xIdx >= cost_map_vector.size() || yIdx < 0 || yIdx >= cost_map_vector[0].size()) throw std::out_of_range("Out of boundaries");
     if(normalized){
-        return (cost_map_vector[xIdx][yIdx] / max_likelihood > 1e-4) ? cost_map_vector[xIdx][yIdx] / max_likelihood : 1e-5;
+        return (cost_map_vector[xIdx][yIdx] / max_likelihood > 1e-6) ? cost_map_vector[xIdx][yIdx] / max_likelihood : 1e-6;
     }
     else{
         return cost_map_vector[xIdx][yIdx];
