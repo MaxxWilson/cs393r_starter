@@ -70,15 +70,18 @@ class SLAM {
 
   pose_2d::Pose2D<float> previous_pose_;
   pose_2d::Pose2D<float> current_pose_;
+  float curr_dist_err = 0;
   
   bool odom_initialized_;
   bool cost_map_initialized;
+
+  std::vector<Eigen::Vector2f> cloud_;
 
   std::vector<pose_2d::Pose2D<float>> poses;
 
   double GetMotionModelLikelihood(double x, double y, double theta);
   void BuildMapFromScan(const vector<Eigen::Vector2f>& cloud, const pose_2d::Pose2D<float> MLE_pose);
-  
+  void DrawPoints(CImg<float> &image, std::vector<Eigen::Vector2f> &point_cloud);
 };
 }  // namespace slam
 

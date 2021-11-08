@@ -46,7 +46,7 @@ ROSBUILD_ADD_EXECUTABLE(slam
                         src/slam/cost_map.cc
                         src/slam/slam_main.cc
                         src/slam/slam.cc)
-TARGET_LINK_LIBRARIES(slam shared_library ${libs})
+TARGET_LINK_LIBRARIES(slam shared_library ${libs} X11)
 
 
 ROSBUILD_ADD_EXECUTABLE(particle_filter
