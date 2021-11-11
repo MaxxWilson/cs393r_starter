@@ -60,7 +60,9 @@ CONFIG_FLOAT(k6, "k6");
 
 CONFIG_FLOAT(laser_offset, "laser_offset");
 
-CONFIG_FLOAT(min_dist_to_update, "min_dist_to_update");
+CONFIG_FLOAT(min_update_dist, "min_update_dist");
+CONFIG_FLOAT(min_update_angle, "min_update_angle");
+
 CONFIG_DOUBLE(sigma_observation, "sigma_observation");
 CONFIG_DOUBLE(gamma, "gamma");
 CONFIG_DOUBLE(dist_short, "dist_short");
@@ -272,19 +274,29 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
                                   float angle_max) {
   // A new laser scan observation is available (in the laser frame)
   // Call the Update and Resample steps as necessary.
-  if((last_update_loc_ - prev_odom_loc_).norm() > CONFIG_min_dist_to_update){
-    //double start_time = GetMonotonicTime();
+  double delta_translation = (last_update_loc_ - prev_odom_loc_).norm();
+  double delta_angle = math_util::AngleDiff(last_update_angle_, prev_odom_angle_);
+  if(delta_translation > CONFIG_min_update_dist || std::abs(delta_angle) > CONFIG_min_update_angle){
+    double start_time = GetMonotonicTime();
     max_weight_log_ = -1e10; // Should be smaller than any
     weight_sum_ = 0;
     weight_bins_.resize(particles_.size());
     std::fill(weight_bins_.begin(), weight_bins_.end(), 0);
 
     // Update each particle with log error weight and find largest weight (smallest negative number)
+    double particle_update_start = GetMonotonicTime();
+    double p_update_start = 0;
+    double p_update_diff_avg = 0;
     for(Particle &p: particles_){
+      p_update_start = GetMonotonicTime();
       Update(ranges, range_min, range_max, angle_min, angle_max, &p);
       max_weight_log_ = std::max(max_weight_log_, p.weight);
+      p_update_diff_avg += GetMonotonicTime() - p_update_start;
     }
-
+    double particle_update_diff = 1000*(GetMonotonicTime() - particle_update_start);
+    p_update_diff_avg /= particles_.size();
+    std::cout << "Particle Update: " << particle_update_diff << " Avg: " << p_update_diff_avg << std::endl;
+    
     // Normalize log-likelihood weights by max log weight and transform back to linear scale
     // Sum all linear weights and generate bins
     for(std::size_t i = 0; i < particles_.size(); i++){
@@ -297,10 +309,12 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
       LowVarianceResample();
     }
     last_update_loc_ = prev_odom_loc_;
+    last_update_angle_ = prev_odom_angle_;
     resample_loop_counter_++;
 
-    // double end_time = GetMonotonicTime();
-    // std::cout << "First: " << 1000*(end_time - start_time) << std::endl;
+    double end_time = GetMonotonicTime();
+
+    // std::cout << "Total Update (ms): " << 1000*(end_time - start_time) << std::endl << std::endl;;
   }                     
 }
 
@@ -334,12 +348,16 @@ void ParticleFilter::Predict(const Vector2f& odom_loc,
     auto rot_bl1_to_map = Eigen::Rotation2D<float>(particle.angle).toRotationMatrix();
     particle.loc += rot_bl1_to_map * noisy_translation;   
     particle.angle += noisy_angle;        
-    cout << noisy_angle - delta_angle << endl;
   }
 
   // Update previous odometry
   prev_odom_loc_ = odom_loc;
   prev_odom_angle_ = odom_angle;
+
+  // double d_translation = (last_update_loc_ - prev_odom_loc_).norm();
+  // double d_angle = math_util::AngleDiff(last_update_angle_, prev_odom_angle_);
+
+  // std::cout << "Motion Model: " << d_translation << ", " << d_angle << std::endl;
 }
 
 void ParticleFilter::Initialize(const string& map_file,
@@ -360,6 +378,7 @@ void ParticleFilter::Initialize(const string& map_file,
   }
   max_weight_log_ = 0;
   last_update_loc_ = prev_odom_loc_;
+  last_update_angle_ = prev_odom_angle_;
   map_.Load(map_file);
   SortMap();
 }

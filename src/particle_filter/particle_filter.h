@@ -126,6 +126,7 @@ class ParticleFilter {
   double weight_sum_ = 0;
 
   Eigen::Vector2f last_update_loc_;
+  float last_update_angle_;
   int resample_loop_counter_ = 0;
 };
 }  // namespace slam
