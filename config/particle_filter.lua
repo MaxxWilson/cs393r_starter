@@ -14,24 +14,26 @@ init_y_sigma = 0.3 -- 99% of the time, within a meter
 init_r_sigma = 0.2  -- 99% of the time, its within 35 deg
 
 -- Motion Model Params --
-k1 = 0.2   -- x error from translation         -- 95% of translations are within 15% margin of error
-k2 = 0.00   -- x error from rotation            -- This is effectively zero given the small angle approx
-k3 = 0.00   -- y error from translation         -- This is effectively zero given the small angle approx
+k1 = 0.4   -- x error from translation         -- 95% of translations are within 15% margin of error
+k2 = 0.0   -- x error from rotation            -- This is effectively zero given the small angle approx
+k3 = 0.1   -- y error from translation         -- This is effectively zero given the small angle approx
 k4 = 0.3   -- y error from rotation            -- at 45 deg, 99% of values within 10 cm
-k5 = 0.3   -- rotation error from translation  -- at 1m, 99% of values within 7 deg
-k6 = 0.5    -- rotation error from rotation     -- 95% of translations are within 15% margin of error
-min_dist_to_update = 0.01                       -- Based on odometry messages at 1m/s at 40Hz
+k5 = 0.5   -- rotation error from translation  -- at 1m, 99% of values within 7 deg
+k6 = 1.5    -- rotation error from rotation     -- 95% of translations are within 15% margin of error
+
+min_update_dist = 0.00                       -- Based on odometry messages at 1m/s at 40Hz
+min_update_angle = 0.00
 
 -- Limited by computation --
-num_particles = 200 -- Increase until computation runs out
-resize_factor = 20          -- # num_points / resize_factor = num_rays
+num_particles = 100 -- Increase until computation runs out
+resize_factor = 10          -- # num_points / resize_factor = num_rays
 
 sigma_observation = 0.1    -- Prof recommends 0.15-0.2 based on sensor specs
-gamma = 1/10                -- TODO Experimental tuning
+gamma = 0.05 -- 0.01                -- TODO Experimental tuning
 
 -- Limits maximum weight error --
 -- Increasing these makes it harsher on short/long errors for scan
-dist_short = 0.15   -- 1 std from sensor 68.2%
-dist_long = 0.3     -- 2 std from sensor 95%
+dist_short = 0.23   -- 1 std from sensor 68.2%
+dist_long = 0.28     -- 2 std from sensor 95%
 
-resample_frequency = 10     -- TODO Experimental tuning
+resample_frequency = 8     -- TODO Experimental tuning
