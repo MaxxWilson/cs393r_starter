@@ -25,15 +25,15 @@ min_update_dist = 0.00                       -- Based on odometry messages at 1m
 min_update_angle = 0.00
 
 -- Limited by computation --
-num_particles = 200 -- Increase until computation runs out
-resize_factor = 5          -- # num_points / resize_factor = num_rays
+num_particles = 100 -- Increase until computation runs out
+resize_factor = 10          -- # num_points / resize_factor = num_rays
 
 sigma_observation = 0.1    -- Prof recommends 0.15-0.2 based on sensor specs
-gamma = 0.03 -- 0.01                -- TODO Experimental tuning
+gamma = 0.05 -- 0.01                -- TODO Experimental tuning
 
 -- Limits maximum weight error --
 -- Increasing these makes it harsher on short/long errors for scan
-dist_short = 0.22   -- 1 std from sensor 68.2%
+dist_short = 0.23   -- 1 std from sensor 68.2%
 dist_long = 0.28     -- 2 std from sensor 95%
 
-resample_frequency = 4     -- TODO Experimental tuning
+resample_frequency = 8     -- TODO Experimental tuning
