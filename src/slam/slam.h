@@ -24,6 +24,8 @@
 
 #include "eigen3/Eigen/Dense"
 #include "eigen3/Eigen/Geometry"
+#include "cost_map.h"
+#include "shared/math/poses_2d.h"
 
 #ifndef SRC_SLAM_H_
 #define SRC_SLAM_H_
@@ -40,7 +42,8 @@ class SLAM {
                     float range_min,
                     float range_max,
                     float angle_min,
-                    float angle_max);
+                    float angle_max,
+                    float angle_increment);
 
   // Observe new odometry-reported location.
   void ObserveOdometry(const Eigen::Vector2f& odom_loc,
@@ -54,10 +57,28 @@ class SLAM {
 
  private:
 
-  // Previous odometry-reported locations.
+  costmap::CostMap cost_map;
+  // Map 
+  std::vector<Eigen::Vector2f> map_;
+  // Current odometry
+  Eigen::Vector2f curr_odom_loc_;
+  float curr_odom_angle_;
+
+  // Odometry at last Pose update
   Eigen::Vector2f prev_odom_loc_;
   float prev_odom_angle_;
+
+  pose_2d::Pose2D<float> previous_pose_;
+  pose_2d::Pose2D<float> current_pose_;
+  
   bool odom_initialized_;
+  bool cost_map_initialized;
+
+  std::vector<pose_2d::Pose2D<float>> poses;
+
+  double GetMotionModelLikelihood(double x, double y, double theta);
+  void BuildMapFromScan(const vector<Eigen::Vector2f>& cloud, const pose_2d::Pose2D<float> MLE_pose);
+  
 };
 }  // namespace slam
 

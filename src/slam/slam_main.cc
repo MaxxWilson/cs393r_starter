@@ -72,6 +72,10 @@ DEFINE_string(odom_topic, "/odom", "Name of ROS topic for odometry data");
 
 DECLARE_int32(v);
 
+// Create config reader entries
+// CONFIG_STRING(test, "test");
+config_reader::ConfigReader config_reader_({"config/slam.lua"});
+
 bool run_ = true;
 slam::SLAM slam_;
 ros::Publisher visualization_publisher_;
@@ -98,7 +102,7 @@ void PublishMap() {
   ClearVisualizationMsg(vis_msg_);
 
   const vector<Vector2f> map = slam_.GetMap();
-  printf("Map: %lu points\n", map.size());
+  //printf("Map: %lu points\n", map.size());
   for (const Vector2f& p : map) {
     visualization::DrawPoint(p, 0xC0C0C0, vis_msg_);
   }
@@ -126,7 +130,8 @@ void LaserCallback(const sensor_msgs::LaserScan& msg) {
       msg.range_min,
       msg.range_max,
       msg.angle_min,
-      msg.angle_max);
+      msg.angle_max,
+      msg.angle_increment);
   PublishMap();
   PublishPose();
 }
