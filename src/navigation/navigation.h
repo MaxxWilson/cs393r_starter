@@ -21,6 +21,9 @@
 
 #include <vector>
 
+#include "vector_map/vector_map.h"
+#include "cost_map/cost_map.h"
+
 #include "eigen3/Eigen/Dense"
 #include "ros/ros.h"
 
@@ -137,6 +140,10 @@ class Navigation {
   uint64_t point_cloud_stamp_;
   //True if point cloud is updated
   bool has_new_points_;
+
+  // Map representation
+  vector_map::VectorMap map_;
+  costmap::CostMap collision_map_;
 
   // Whether navigation is complete.
   bool nav_complete_;

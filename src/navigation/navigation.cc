@@ -30,8 +30,9 @@
 #include "shared/math/math_util.h"
 #include "shared/util/timer.h"
 #include "shared/ros/ros_helpers.h"
-#include "navigation.h"
 #include "visualization/visualization.h"
+#include "config_reader/config_reader.h"
+#include "navigation.h"
 
 #include "obstacle_avoidance/obstacle_avoidance.h"
 #include "obstacle_avoidance/car_params.h"
@@ -57,6 +58,8 @@ const float kEpsilon = 1e-5;
 
 namespace navigation {
 
+
+
 Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
     odom_initialized_(false),
     localization_initialized_(false),
@@ -77,6 +80,9 @@ Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
   InitRosHeader("base_link", &drive_msg_.header);
 
   vel_commands_ = std::vector<CommandStamped>(10);
+
+  map_.Load(map_file);
+  collision_map_ = costmap::CostMap();
 }
 
 void Navigation::SetNavGoal(const Vector2f& loc, float angle) {
@@ -128,24 +134,13 @@ void Navigation::TimeOptimalControl(const PathOption& path) {
     double min_stop_distance = car_params::safe_distance-0.5*current_speed*current_speed/car_params::min_acceleration; //calculate the minimum stopping distance at current velocity
     double set_speed = (path.free_path_length>min_stop_distance)?car_params::max_velocity:0; //decelerate if free path is is smaller than minimum stopping distance otherwise accelerate
     
-    //std::cout << "free path: " << path.free_path_length << std::endl;
-    //std::cout << "min stop: " << min_stop_distance << std::endl;
-    
-    //publish command to topic 
-    // drive_msg_.header.seq++;
-    // drive_msg_.header.stamp = ros::Time::now();
-    // drive_msg_.curvature = path.curvature;
-    // drive_msg_.velocity = set_speed;
-
+    // Publish command to topic 
     drive_msg_.header.seq++;
     drive_msg_.header.stamp = ros::Time::now();
-    drive_msg_.curvature = 1;
-    drive_msg_.velocity = 1;
-
-    std::cout << path.free_path_length << std::endl;
+    drive_msg_.curvature = path.curvature;
+    drive_msg_.velocity = set_speed;
 
     drive_pub_.publish(drive_msg_);
-    //TODO: record the commands used for latency compensation
 }
 
 void Navigation::TransformPointCloud(TimeShiftedTF transform){
@@ -157,6 +152,13 @@ void Navigation::TransformPointCloud(TimeShiftedTF transform){
 
   for(std::size_t i = 0; i < point_cloud_.size(); i++){
     transformed_point_cloud_[i] =  R*(point_cloud_[i] - transform.position);
+  }
+}
+
+void Navigation::GetCollisionMap(){
+  vector<vector<double>>();
+    for (size_t i = 0; i < map_.lines.size(); ++i) {
+      const geometry::line2f line = map_.lines[i];
   }
 }
 
@@ -269,28 +271,6 @@ void Navigation::Run(){
   
   // 7) Publish commands with 1-D TOC, update vector of previous vehicle commands
   TimeOptimalControl(best_path);
-
-    // static double start_timer;
-    // if(first_cycle){
-    //   first_cycle = false;
-    //   start_timer = GetMonotonicTime();
-    //   std::cout << "Start Time: " << start_timer << std::endl;
-    //   std::cout << "Start Time + 2: " << start_timer + 2<< std::endl;
-    // }
-
-    // // Remove for obstacle avoidance
-    // std::cout << "Curr Time: " << GetMonotonicTime() << std::endl;
-    // if(GetMonotonicTime() < start_timer + 1.0){
-    //   drive_msg_.curvature = 0.0;
-    //   drive_msg_.velocity = 1.0;
-    // }
-    // else{
-    //   drive_msg_.curvature = 0.0;
-    //   drive_msg_.velocity = 0.0;
-    // }
-
-    drive_pub_.publish(drive_msg_);
-    // Remove for obstacle avoidance
     
   CommandStamped drive_cmd(drive_msg_.velocity, drive_msg_.curvature, drive_msg_.header.stamp.toNSec() + car_params::actuation_latency);
   vel_commands_.push_back(drive_cmd);

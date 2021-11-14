@@ -24,7 +24,7 @@
 
 #include "eigen3/Eigen/Dense"
 #include "eigen3/Eigen/Geometry"
-#include "cost_map.h"
+#include "cost_map/cost_map.h"
 #include "shared/math/poses_2d.h"
 
 #ifndef SRC_SLAM_H_

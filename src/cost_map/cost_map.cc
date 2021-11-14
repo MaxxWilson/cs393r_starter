@@ -30,12 +30,8 @@ using math_util::Sq;
 namespace costmap{
 
 CONFIG_FLOAT(map_length_dist, "map_length_dist");
-CONFIG_FLOAT(dist_update_thresh, "dist_update_thresh");
-CONFIG_FLOAT(laser_offset, "laser_offset");
-CONFIG_FLOAT(range_max, "range_max");
 CONFIG_FLOAT(dist_res, "dist_res");
 CONFIG_DOUBLE(sigma_observation, "sigma_observation");
-CONFIG_DOUBLE(gamma, "gamma");
 CONFIG_INT(row_num, "row_num");
 
 
@@ -67,7 +63,6 @@ void CostMap::UpdateMap(const std::vector<Eigen::Vector2f> &cloud){
                 
                 // Add bin likelihood using distance from mean
                 double dist_from_scan_point = (scan_point_bin - curr_position).norm();
-                // double log_likelihood = -Sq(dist_from_scan_point) / Sq(CONFIG_sigma_observation);
 
                 //Calculate normal gaussian distribution to be put into cost map
                 double gauss_dist = statistics::ProbabilityDensityGaussian(0.0, dist_from_scan_point, CONFIG_sigma_observation);
