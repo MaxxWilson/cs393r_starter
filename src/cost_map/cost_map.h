@@ -52,8 +52,16 @@ class CostMap{
         int GetIndexFromDist(double dist);
         float RoundToResolution(float value, float res);
         void ClearMap();
+        inline int GetRowNum() const {
+            return cost_map_vector.size();
+        };
+        inline int GetColNum() const {
+            return cost_map_vector[0].size();
+        };
+        inline double GetValueAtIdx(int xIdx, int yIdx) {
+            return cost_map_vector[xIdx][yIdx];
+        }
     private:
-        //int row_num = 2*(CONFIG_dist_update_thresh + CONFIG_range_max + CONFIG_laser_offset)/CONFIG_dist_res + 1;
         vector<vector<double>> cost_map_vector;
 
 };

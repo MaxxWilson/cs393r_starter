@@ -45,6 +45,7 @@
 #include "shared/math/math_util.h"
 #include "shared/util/timer.h"
 #include "shared/ros/ros_helpers.h"
+#include "config_reader/config_reader.h"
 
 #include "navigation.h"
 
@@ -70,6 +71,7 @@ DEFINE_string(init_topic,
               "Name of ROS topic for initialization");
 DEFINE_string(map, "maps/GDC1.txt", "Name of vector map file");
 
+config_reader::ConfigReader config_reader_({"config/navigation.lua"});
 
 bool run_ = true;
 sensor_msgs::LaserScan last_laser_msg_;
