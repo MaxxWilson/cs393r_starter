@@ -140,11 +140,6 @@ void Navigation::TimeOptimalControl(const PathOption& path) {
     drive_msg_.curvature = path.curvature;
     drive_msg_.velocity = set_speed;
 
-    drive_pub_.publish(drive_msg_);
-}
-
-void Navigation::TransformPointCloud(TimeShiftedTF transform){
-
   Eigen::Matrix2f R;
   R << cos(transform.theta), sin(transform.theta), -sin(transform.theta), cos(transform.theta);
 

@@ -21,9 +21,12 @@
 
 #include "eigen3/Eigen/Dense"
 #include "eigen3/Eigen/Geometry"
-#include <vector>
+#include "visualization/CImg.h"
 
+#include <vector>
 using std::vector;
+using cimg_library::CImg;
+using cimg_library::CImgDisplay;
 
 #ifndef COST_MAP_H_
 #define COST_MAP_H_
@@ -39,12 +42,15 @@ class CostMap{
         double max_likelihood;
 
         //Updates rasterized cost table given a new laser scan  
-        void UpdateMap(const std::vector<Eigen::Vector2f> &cloud);
-
+        void UpdateCostMap(const std::vector<Eigen::Vector2f> &cloud);
+        
+        void DrawCostMap(CImg<float> &image);
+        void DisplayImage(CImg<float> &image);
+        
         void SetLikelihoodAtPosition(double x, double y, double likelihood);
-        double GetLikelihoodAtPosition(double x, double y);
+        double GetLikelihoodAtPosition(double x, double y, bool normalized = true);
         int GetIndexFromDist(double dist);
-        float RoundToResolution(float value);
+        float RoundToResolution(float value, float res);
         void ClearMap();
         inline int GetRowNum() const {
             return cost_map_vector.size();

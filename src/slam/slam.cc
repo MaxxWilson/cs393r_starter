@@ -36,6 +36,10 @@
 
 #include "vector_map/vector_map.h"
 
+#include "visualization/CImg.h"
+using cimg_library::CImg;
+using cimg_library::CImgDisplay;
+
 using namespace math_util;
 using Eigen::Affine2f;
 using Eigen::Rotation2Df;
@@ -62,7 +66,10 @@ CONFIG_FLOAT(map_length_dist, "map_length_dist");
 CONFIG_DOUBLE(gamma, "gamma");
 CONFIG_DOUBLE(resize_factor, "resize_factor");
 CONFIG_FLOAT(range_max, "range_max");
+CONFIG_INT(row_num, "row_num");
 
+CONFIG_FLOAT(theta_search_const, "theta_search_const");
+CONFIG_FLOAT(dist_search_const, "dist_search_const");
 
 CONFIG_FLOAT(k1, "k1");
 CONFIG_FLOAT(k2, "k2");
@@ -92,41 +99,51 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
   // A new laser scan has been observed. Decide whether to add it as a pose
   // for SLAM. If decided to add, align it to the scan from the last saved pose,
   // and save both the scan and the optimized pose.
+  
+  static CImg<float> image(CONFIG_row_num, CONFIG_row_num, 1,3,1);
 
-  // 
   if (!odom_initialized_) {
     return;
   }
   if(odom_initialized_ && !cost_map_initialized){
     cost_map = costmap::CostMap();
 
-    vector<float> trimmed_ranges((int) (ranges.size() / CONFIG_resize_factor));
-    vector<Vector2f> cloud(trimmed_ranges.size());
+    cloud_ = vector<Vector2f>(ranges.size());
 
-    for(std::size_t i = 0; i < trimmed_ranges.size(); i++) {
-      trimmed_ranges[i] = ranges[i * CONFIG_resize_factor];
-    }
-
-    for(std::size_t i = 0; i < trimmed_ranges.size(); i++){
+    std::cout << "First Cloud" << std::endl;
+    for(std::size_t i = 0; i < ranges.size(); i++){
       // Polar to Cartesian conversion, transforms to base link frame of new pose
-      float angle = angle_min + angle_increment*i*CONFIG_resize_factor;
-      float x = trimmed_ranges[i]*cos(angle) + CONFIG_laser_offset;
-      float y = trimmed_ranges[i]*sin(angle);
-      cloud[i] = Vector2f(x, y);
+      float angle = angle_min + angle_increment*i;
+      float x = ranges[i]*cos(angle) + CONFIG_laser_offset;
+      float y = ranges[i]*sin(angle);
+      cloud_[i] = Vector2f(x, y);
     }
 
-    cost_map.UpdateMap(cloud);
-    BuildMapFromScan(cloud, poses.back());
+    cost_map.UpdateCostMap(cloud_);
+    BuildMapFromScan(cloud_, poses.back());
     cost_map_initialized = true;
+
+    // New cloud + static transform
+    // for(int i = 0; i < cloud_.size(); i++){
+    //   cloud_[i] = R_NewPos2OldPos.inverse()*(cloud_[i] - trans);
+    // }
+
+    //cost_map.DrawCostMap(image);
+    
+    // DrawPoints(image, cloud_);
+    // cost_map.DisplayImage(image);
     return;
   }
+
   // Get odometry change since last pose update
-  Vector2f odom_loc_diff = current_pose_.translation - poses.back().translation;
+  auto rot_to_last_pose = Eigen::Rotation2D<float>(-poses.back().angle).toRotationMatrix();
+  
+  Vector2f odom_loc_diff = rot_to_last_pose*(current_pose_.translation - poses.back().translation);
   double odom_dist = odom_loc_diff.norm();
   float odom_angle_diff = AngleDiff(current_pose_.angle, poses.back().angle);
 
   // See if we have moved far enough to update
-  if(odom_dist > CONFIG_dist_update_thresh || abs(odom_angle_diff) > CONFIG_angle_update_thresh) {
+  if(curr_dist_err > CONFIG_dist_update_thresh || abs(odom_angle_diff) > CONFIG_angle_update_thresh) {
     double start = GetMonotonicTime();
 
     double P = -1e10;   // Log Probability of pose
@@ -139,54 +156,78 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
     // std::cout << "angle sigma: " << angle_sigma << std::endl;
 
     // Set search region to 3 standard deviations from mean to cover 99.73% of values
-    double search_factor = 3.0;
+    double search_factor = 1.0;
     float theta_low = (search_factor*angle_sigma < 3.14159) ? -search_factor*angle_sigma : 0;
     float theta_high = (search_factor*angle_sigma < 3.14159) ? search_factor*angle_sigma : 2*3.14159;
     float translation_low = (search_factor*trans_sigma < CONFIG_map_length_dist) ? -search_factor*trans_sigma : 0;
     float translation_high = (search_factor*trans_sigma < CONFIG_map_length_dist) ? search_factor*trans_sigma : CONFIG_map_length_dist;
 
-    vector<float> trimmed_ranges((int) (ranges.size() / CONFIG_resize_factor));
+    // theta_low = cost_map.RoundToResolution(theta_low - CONFIG_theta_res, CONFIG_theta_res);
+    // theta_high = cost_map.RoundToResolution(theta_high + CONFIG_theta_res, CONFIG_theta_res);
+    // translation_low = cost_map.RoundToResolution(translation_low - CONFIG_dist_res, CONFIG_dist_res);
+    // translation_high = cost_map.RoundToResolution(translation_high + CONFIG_dist_res, CONFIG_dist_res);
 
-    // Calculate the particle weight
-    for(std::size_t i = 0; i < trimmed_ranges.size(); i++) {
-      if(ranges[i * CONFIG_resize_factor] <= CONFIG_range_max){
-        trimmed_ranges[i] = ranges[i * CONFIG_resize_factor];
-      }
-      else{
-        trimmed_ranges[i] = CONFIG_range_max + 2.0;
-      }
-    }
+    theta_low = -CONFIG_theta_search_const*CONFIG_theta_res;
+    theta_high = CONFIG_theta_search_const*CONFIG_theta_res;
+    translation_low = -CONFIG_dist_search_const*CONFIG_dist_res;
+    translation_high = CONFIG_dist_search_const*CONFIG_dist_res;
 
-    vector<Vector2f> cloud(trimmed_ranges.size());
-    for(std::size_t i = 0; i < trimmed_ranges.size(); i++){
+    // theta_low = -5*CONFIG_theta_res;
+    // theta_high = 5*CONFIG_theta_res;
+    // translation_low = -7*CONFIG_dist_res;
+    // translation_high = 7*CONFIG_dist_res;
+
+    cloud_.resize(ranges.size());
+    for(std::size_t i = 0; i < ranges.size(); i++){
       // Polar to Cartesian conversion, transforms to base link frame of new pose
-      float angle = angle_min + angle_increment*i*CONFIG_resize_factor;
-      float x = trimmed_ranges[i]*cos(angle) + CONFIG_laser_offset;
-      float y = trimmed_ranges[i]*sin(angle);
-      cloud[i] = Vector2f(x, y);
+      float angle = angle_min + angle_increment*i;
+      float x = ranges[i]*cos(angle) + CONFIG_laser_offset;
+      float y = ranges[i]*sin(angle);
+      cloud_[i] = Vector2f(x, y);
     }
+
+    // std::cout << "Num Theta: " << (theta_high - theta_low) / CONFIG_theta_res << std::endl;
+    // std::cout << "Num Dist: " << (translation_high - translation_low) / CONFIG_dist_res << std::endl;
+    // std::cout << "Odom Diff: " << odom_loc_diff.x() << ", " << odom_loc_diff.y() << ", " << odom_angle_diff << std::endl;
 
     // Iterate over possible change in theta
-    for(int angle_index = 0; angle_index < (theta_high - theta_low) / CONFIG_theta_res; angle_index++){
+    for(int angle_index = 0; angle_index <= (theta_high - theta_low) / CONFIG_theta_res; angle_index++){
       float dtheta = theta_low + angle_index * CONFIG_theta_res;
-      for(int x_index = 0; x_index < (translation_high - translation_low) / CONFIG_dist_res; x_index++){
+        double log_ptheta = -Sq(dtheta)/Sq(angle_sigma);
+        log_ptheta = (log_ptheta > std::log(1e-50)) ? log_ptheta : std::log(1e-50);
+
+      for(int x_index = 0; x_index <= (translation_high - translation_low) / CONFIG_dist_res; x_index++){
         float dx = translation_low + x_index * CONFIG_dist_res;
-        for(int y_index = 0; y_index < (translation_high - translation_low) / CONFIG_dist_res; y_index++){
+        double log_px = -Sq(dx)/Sq(trans_sigma);
+        log_px = (log_px > std::log(1e-50)) ? log_px : std::log(1e-50);
+
+        for(int y_index = 0; y_index <= (translation_high - translation_low) / CONFIG_dist_res; y_index++){
           float dy = translation_low + y_index * CONFIG_dist_res;
-          //double start = GetMonotonicTime();
-          
+
           double pose_log_prob = 0.0;
           
           // For each XY point in scan, get log likelihood from CSM
           // Pose2D<float> curPos(dtheta + curr_odom_angle_, dx + curr_odom_loc_.x(), dy + curr_odom_loc_.y());
           
-          Vector2f trans_diff = odom_loc_diff + Eigen::Vector2f(dx, dy);
-          float angle_diff = odom_angle_diff + dtheta;
-          Eigen::Rotation2Df R_NewPos2OldPos(angle_diff);
+          Vector2f trans_diff;
+          trans_diff[0] = cost_map.RoundToResolution(odom_loc_diff.x() + dx, CONFIG_dist_res);
+          trans_diff[1] = cost_map.RoundToResolution(odom_loc_diff.y() + dy, CONFIG_dist_res);
+          //odom_loc_diff + Eigen::Vector2f(dx, dy);
+          float angle_diff = cost_map.RoundToResolution(odom_angle_diff + dtheta, CONFIG_theta_res);
+          Eigen::Rotation2Df R_NewPos2OldPos1(angle_diff);
           
-          for(std::size_t i = 0; i < cloud.size(); i++){
-              Vector2f point = cloud[i];
-              Vector2f scanPos = R_NewPos2OldPos * point + trans_diff;
+          //double start = GetMonotonicTime();
+          for(std::size_t i = 0; i < cloud_.size(); i+=10){
+            Vector2f scanPos = R_NewPos2OldPos1 * cloud_[i] + trans_diff;
+              
+            //float blue[3]= {0, 0, 1};
+    
+            if(scanPos.norm() >= CONFIG_range_max) {
+              continue;
+            }
+            
+            //image.draw_point(cost_map.GetIndexFromDist(scanPos.x()), CONFIG_row_num - cost_map.GetIndexFromDist(scanPos.y()) - 1, blue, 1);
+
               try{
                 double gaussian_prob = cost_map.GetLikelihoodAtPosition(scanPos.x(), scanPos.y());
                 gaussian_prob = (gaussian_prob > 1e-50) ? gaussian_prob : 1e-50;
@@ -195,45 +236,100 @@ void SLAM::ObserveLaser(const vector<float>& ranges,
                 continue;
               }
           }
+          //double end = GetMonotonicTime();
+          //std::cout << "Inner Loop " << end - start << std::endl;
+
           
           // compute motion model likelihood
-          double log_px = -Sq(dx)/Sq(trans_sigma);
+
+
           double log_py = -Sq(dy)/Sq(trans_sigma);
-          double log_ptheta = -Sq(dtheta)/Sq(angle_sigma);
+          log_py = (log_py > std::log(1e-50)) ? log_py : std::log(1e-50);
+
+          //std::cout << "dtheta, dx, dy, obs, x, y, theta: " << ((float) ((int) (1000*dtheta)))/1000 << ", " << ((float) ((int) (1000*dx)))/1000 << ", " << ((float) ((int) (1000*dy)))/1000 << ", ";
+          //std::cout << ((float) ((int) (1000*pose_log_prob)))/1000 << ", " << ((float) ((int) (1000*log_px)))/1000 << ", " << ((float) ((int) (1000*log_py)))/1000 << ", " << ((float) ((int) (1000*log_ptheta)))/1000 << std::endl;
+
           // double log_px = -Sq(trans_diff.x())/Sq(trans_sigma);
           // double log_py = -Sq(trans_diff.y())/Sq(trans_sigma);
           // double log_ptheta = -Sq(angle_diff)/Sq(angle_sigma);
 
-          //std::cout << "P, M, dx, dy, dtheta: " << pose_log_prob << ", " << log_px << ", " << log_py << ", " << log_ptheta << ", " << dx << ", " << dy << ", " << dtheta << std::endl;
+          // cost_map.DisplayImage(image);
+          // image.fill(1);
+          // cost_map.DrawCostMap(image);
 
           // Update most likely transform
-          if(P < pose_log_prob + log_px + log_py + log_ptheta){
+          if( P < pose_log_prob + log_px + log_py + log_ptheta){
             P = pose_log_prob + log_px + log_py + log_ptheta;
             T = Pose2D<float>(angle_diff, trans_diff);
             // T = Pose2D<float>(AngleDiff(dtheta + curr_odom_angle_, poses.front().angle), Eigen::Vector2f(dx, dy));
           }
 
-          // double end = GetMonotonicTime();
-          // std::cout << "Inner Loop " << end - start << std::endl;
         }
       }
+
+
+      
     }
 
     // Update cost map based on new laser scan
-    cost_map.UpdateMap(cloud);
+    cost_map.UpdateCostMap(cloud_);
 
     // Append new pose to list of poses
     Pose2D<float> latest_pose(poses.back());
     latest_pose.ApplyPose(T);
     poses.push_back(latest_pose);
     current_pose_ = Pose2D<float>(latest_pose);
+    curr_dist_err = 0;
+
+    // TESTING //
+
+    // std::cout << "Theta bounds: " << theta_low << ", " << theta_high << std::endl;
+    // std::cout << "Location bounds: " << translation_low << ", " << translation_high << std::endl;
+    // std::cout << "Actual Transform: (" << odom_loc_diff.x() << ", " << odom_loc_diff.y() << "), " << odom_angle_diff << "\n";
+    // std::cout << "Estimated Transform: (" << T.translation.x() << ", " << T.translation.y() << "), " << T.angle << "\n" << "\n";
+
+    // if(abs(AngleDiff(T.angle, odom_angle_diff)) > 5*CONFIG_theta_res){
+
+    //   cost_map.DrawCostMap(image);
+    //   float blue[3]= {0, 0, 1};
+    //   for(std::size_t i = 0; i < cloud_.size(); i += CONFIG_resize_factor){
+    
+    //     if(cloud_[i].norm() >= CONFIG_range_max) {
+    //       continue;
+    //     }
+        
+    //     // Rotate into map frame, then translate according to pose
+    //     Eigen::Rotation2Df pose_to_map(T.angle);
+    //     Eigen::Vector2f scan_in_map = pose_to_map*cloud_[i] + T.translation;
+    //   image.draw_point(cost_map.GetIndexFromDist(scan_in_map.x()), CONFIG_row_num - cost_map.GetIndexFromDist(scan_in_map.y()) - 1, blue, 1);
+    //   }
+    //   cost_map.DisplayImage(image);
+    // }
+    // TESTING //
+
 
     // Update the environment map with new scan and pose
-    BuildMapFromScan(cloud, poses.back());
+    BuildMapFromScan(cloud_, poses.back());
 
     double end = GetMonotonicTime();
     std::cout << end - start << std::endl;
   }
+}
+
+void SLAM::DrawPoints(CImg<float> &image, std::vector<Eigen::Vector2f> &point_cloud){
+    float blue[3]= {0, 0, 1};
+    for(std::size_t i = 0; i < point_cloud.size(); i++){
+    
+      if(point_cloud[i].norm() >= CONFIG_range_max) {
+        continue;
+      }
+      
+      // // Rotate into map frame, then translate according to pose
+      // Eigen::Rotation2Df pose_to_map(poses.back().angle);
+      // Eigen::Vector2f scan_in_map = pose_to_map*cloud_[i] + poses.back().translation;
+      
+      image.draw_point(cost_map.GetIndexFromDist(point_cloud[i].x()), CONFIG_row_num - cost_map.GetIndexFromDist(point_cloud[i].y()) - 1, blue, 1);
+    }
 }
 
 void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
@@ -256,8 +352,11 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
   Eigen::Vector2f delta_translation = rot_odom1_to_bl1 * (odom_loc - prev_odom_loc_);
   float delta_angle = math_util::AngleDiff(odom_angle, prev_odom_angle_);
 
+  //std::cout << "X, Y, Theta: " << delta_translation.x() << ", " << delta_translation.y() << ", " << delta_angle << std::endl;
+
   Pose2D<float>delta_pose_(delta_angle, delta_translation);
   current_pose_.ApplyPose(delta_pose_);
+  curr_dist_err += delta_translation.norm();
 
   //std::cout << current_pose_.translation.x() << ", " << current_pose_.translation.y() << ", " << current_pose_.angle << std::endl;
 
@@ -267,7 +366,7 @@ void SLAM::ObserveOdometry(const Vector2f& odom_loc, const float odom_angle) {
 }
 
 void SLAM::BuildMapFromScan(const vector<Vector2f>& cloud, const Pose2D<float> MLE_pose) {
-  for(std::size_t i = 0; i < cloud.size(); i++){
+  for(std::size_t i = 0; i < cloud.size(); i += CONFIG_resize_factor){
     
     if(cloud[i].norm() >= CONFIG_range_max) {
       continue;
@@ -275,7 +374,7 @@ void SLAM::BuildMapFromScan(const vector<Vector2f>& cloud, const Pose2D<float> M
     
     // Rotate into map frame, then translate according to pose
     Eigen::Rotation2Df pose_to_map(MLE_pose.angle);
-    Eigen::Vector2f scan_in_map = pose_to_map.toRotationMatrix()*cloud[i] + MLE_pose.translation;
+    Eigen::Vector2f scan_in_map = pose_to_map*cloud[i] + MLE_pose.translation;
     
     map_.push_back(scan_in_map);
   }
