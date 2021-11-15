@@ -26,18 +26,39 @@
 #include "eigen3/Eigen/Dense"
 #include "eigen3/Eigen/Geometry"
 
+#include "visualization/CImg.h"
+using cimg_library::CImg;
+using cimg_library::CImgDisplay;
+
 using math_util::Sq;
 namespace costmap{
 
 CONFIG_FLOAT(map_length_dist, "map_length_dist");
 CONFIG_FLOAT(dist_res, "dist_res");
 CONFIG_DOUBLE(sigma_observation, "sigma_observation");
+CONFIG_DOUBLE(range_max, "range_max");
 CONFIG_INT(row_num, "row_num");
-CONFIG_FLOAT(cost_map_min_prob, "cost_map_min_prob");
+CONFIG_INT(dilation_factor, "dilation_factor");
 
 
 CostMap::CostMap(): cost_map_vector(CONFIG_row_num, vector<double>(CONFIG_row_num, 0.0)){
     max_likelihood = 0.0;
+}
+
+void CostMap::UpdateCollisionMap(const std::vector<geometry::line2f> lines){
+    for (size_t i = 0; i < lines.size(); ++i) {
+        const geometry::line2f line = lines[i];
+        for(int i = 0; i <= line.Length() / CONFIG_dist_res; i++){
+            Eigen::Vector2f point = line.p0 + line.Dir() * CONFIG_dist_res * i;
+            for(int x = -CONFIG_dilation_factor; x <= CONFIG_dilation_factor; x++){
+                for(int y = -CONFIG_dilation_factor; y <= CONFIG_dilation_factor; y++){
+                    int xIdx = GetIndexFromDist(point.x() + x*CONFIG_dist_res);
+                    int yIdx = GetIndexFromDist(point.y() + y*CONFIG_dist_res);
+                    cost_map_vector[xIdx][yIdx] = 1.0;
+                }
+            }
+        }
+    }
 }
 
 // Given a scan, clear the lookup table and calculate new lookup table gaussian distribution values

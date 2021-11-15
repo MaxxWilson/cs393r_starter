@@ -16,10 +16,11 @@ public:
     // map frame coordinate
     float x;
     float y;
-    float angle; // car angle
+    
     Node* parent;
-    Node(int _xIdx, int _yIdx): xIdx(_xIdx), yIdx(_yIdx) {}
+    Node(int _xIdx, int _yIdx): xIdx(_xIdx), yIdx(_yIdx), parent(NULL) {}
     friend bool operator == (Node const &, Node const &);
+    friend bool operator != (Node const &, Node const &);
 };
 // 
 int RRT(cosnt CostMap& collision_map, const Node& start, const Node& end, list<Node*>& plan);

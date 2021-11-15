@@ -21,7 +21,6 @@
 
 #include <vector>
 
-#include "vector_map/vector_map.h"
 #include "cost_map/cost_map.h"
 
 #include "eigen3/Eigen/Dense"

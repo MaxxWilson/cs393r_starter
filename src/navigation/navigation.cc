@@ -36,12 +36,15 @@
 
 #include "obstacle_avoidance/obstacle_avoidance.h"
 #include "obstacle_avoidance/car_params.h"
+#include "visualization/CImg.h"
 
 using Eigen::Vector2f;
 using amrl_msgs::AckermannCurvatureDriveMsg;
 using amrl_msgs::VisualizationMsg;
 using std::string;
 using std::vector;
+using cimg_library::CImg;
+using cimg_library::CImgDisplay;
 
 using namespace math_util;
 using namespace ros_helpers;
@@ -57,7 +60,13 @@ const float kEpsilon = 1e-5;
 } //namespace
 
 namespace navigation {
+  static int x_a = 0;
+  static int x_b = 1;
+  static int y_a = 0;
+  static int y_b = 1;
 
+
+CONFIG_INT(row_num, "row_num");
 
 
 Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
@@ -83,6 +92,20 @@ Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
 
   map_.Load(map_file);
   collision_map_ = costmap::CostMap();
+  collision_map_.ClearMap();
+  collision_map_.UpdateCollisionMap(map_.lines);
+  
+  CImg<float> image(CONFIG_row_num, CONFIG_row_num, 1,1,1);
+  float color = 0.2;
+
+  for(int x = 0; x < CONFIG_row_num; x++){
+    for(int y = 0; y < CONFIG_row_num; y++){
+      // Image coordinate frame is LHR
+      image.draw_point(x, CONFIG_row_num - y - 1, &color, collision_map_.GetValueAtIdx(x, y));
+    }
+  }
+
+  collision_map_.DisplayImage(image);
 }
 
 void Navigation::SetNavGoal(const Vector2f& loc, float angle) {
@@ -140,6 +163,11 @@ void Navigation::TimeOptimalControl(const PathOption& path) {
     drive_msg_.curvature = path.curvature;
     drive_msg_.velocity = set_speed;
 
+    drive_pub_.publish(drive_msg_);
+}
+
+void Navigation::TransformPointCloud(TimeShiftedTF transform){
+
   Eigen::Matrix2f R;
   R << cos(transform.theta), sin(transform.theta), -sin(transform.theta), cos(transform.theta);
 
@@ -150,12 +178,22 @@ void Navigation::TimeOptimalControl(const PathOption& path) {
   }
 }
 
-void Navigation::GetCollisionMap(){
-  vector<vector<double>>();
-    for (size_t i = 0; i < map_.lines.size(); ++i) {
-      const geometry::line2f line = map_.lines[i];
-  }
-}
+// // void Navigation::PurePursuit(amrl_msgs::VisualizationMsg& msg){
+// //     int x[5][2] = {{0,1}, {2,3}, {4,10}, {6, 14}, {7, 25}};
+// //     Eigen::Vector2f point_a = {x[x_a][1], x[y_a][2]};//starting point of current line on local path
+// //     Eigen::Vector2f point_b = {x[x_b][1], x[y_b][2]};//ending point of current line on local path
+// //     Eigen::Vector2f point_c = {x[x_a + 1][1], x[y_a + 1][2]};//starting point of next line on local path
+// //     Eigen::Vector2f point_d = {x[x_b + 1][1], x[y_b + 1][2]};//ending point of next line on local path
+
+// //     visualization::DrawLine(point_a, point_b, 0xfcba03, msg); // draws current local line to travel on
+// //     visualization::DrawLine(point_c, point_d, 0xfcba03, msg); // draws next local line to travel on
+
+// //     x_a = x_a + 1;
+// //     x_b = x_b + 1;
+// //     y_a = y_a + 1;
+// //     y_b = y_b + 1;
+// // }
+
 
 void Navigation::Run(){
   //This function gets called 20 times a second to form the control loop.
