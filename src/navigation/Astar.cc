@@ -143,6 +143,9 @@ namespace astar {
                      && isUnBlocked(collision_map, newR, newC)
                             == true) {
                     double gNew = cellDetails[r][c].g + 1.0;
+                    if(i >= 4) {
+                        gNew = cellDetails[r][c].g + 1.414;
+                    }
                     double hNew = getHValue(newR, newC, dest);
                     double fNew = gNew + hNew;
     
