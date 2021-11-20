@@ -111,6 +111,20 @@ Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
 }
 
 void Navigation::SetNavGoal(const Vector2f& loc, float angle) {
+  double start_time = GetMonotonicTime();
+  visualization::ClearVisualizationMsg(global_viz_msg_);
+  astar::Astar global_planner(collision_map_);
+
+  Eigen::Vector2f start(robot_loc_);
+  Eigen::Vector2f end{loc.x(), loc.y()};
+
+  visualization::DrawCross(start, 0.25,0xfc4103,global_viz_msg_);
+  visualization::DrawCross(end, 0.25,0xfc4103,global_viz_msg_);
+  if(global_planner.AstarSearch(collision_map_, collision_map_.GetIndexPairFromDist(robot_loc_), collision_map_.GetIndexPairFromDist(end))) {
+    global_planner.tracePath(global_viz_msg_ , collision_map_, collision_map_.GetIndexPairFromDist(end));
+  }
+  double end_time = GetMonotonicTime();
+  std::cout << "Global Planning Time: " << end_time - start_time << std::endl;
 }
 
 void Navigation::UpdateLocation(const Eigen::Vector2f& loc, float angle) {
@@ -204,19 +218,11 @@ void Navigation::Run(){
   
   // Clear previous visualizations.
   visualization::ClearVisualizationMsg(local_viz_msg_);
-  visualization::ClearVisualizationMsg(global_viz_msg_);
+  //visualization::ClearVisualizationMsg(global_viz_msg_);
 
   // If odometry has not been initialized, we can't do anything.
   if (!odom_initialized_) return;
   //This function gets called 20 times a second to form the control loop.
-  static astar::Astar global_planner(collision_map_);
-  Eigen::Vector2f start(robot_loc_);
-  Eigen::Vector2f end{robot_loc_.x() + 1, robot_loc_.y() + 8};
-  visualization::DrawCross(start, 0.25,0xfc4103,global_viz_msg_);
-  visualization::DrawCross(end, 0.25,0xfc4103,global_viz_msg_);
-  if(global_planner.AstarSearch(collision_map_, collision_map_.GetIndexPairFromDist(robot_loc_), collision_map_.GetIndexPairFromDist(end))) {
-    global_planner.tracePath(global_viz_msg_ , collision_map_, collision_map_.GetIndexPairFromDist(end));
-  }
   
   //Latency Compensation
   obstacle_avoidance::CleanVelocityBuffer(vel_commands_, std::min(odom_stamp_, point_cloud_stamp_));
@@ -327,7 +333,7 @@ void Navigation::Run(){
   viz_pub_.publish(local_viz_msg_);
   viz_pub_.publish(global_viz_msg_);
 
-  sleep(30);
+  //sleep(30);
 }
 
 }  // namespace navigation
