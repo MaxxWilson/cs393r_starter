@@ -33,10 +33,12 @@
 #include "visualization/visualization.h"
 #include "config_reader/config_reader.h"
 #include "navigation.h"
-
+#include "Astar.h"
 #include "obstacle_avoidance/obstacle_avoidance.h"
 #include "obstacle_avoidance/car_params.h"
 #include "visualization/CImg.h"
+
+#include <utility>
 
 using Eigen::Vector2f;
 using amrl_msgs::AckermannCurvatureDriveMsg;
@@ -105,7 +107,7 @@ Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
     }
   }
 
-  collision_map_.DisplayImage(image);
+  // collision_map_.DisplayImage(image);
 }
 
 void Navigation::SetNavGoal(const Vector2f& loc, float angle) {
@@ -196,7 +198,7 @@ void Navigation::TransformPointCloud(TimeShiftedTF transform){
 
 
 void Navigation::Run(){
-  //This function gets called 20 times a second to form the control loop.
+  
   uint64_t start_loop_time = ros::Time::now().toNSec();
   uint64_t actuation_time = start_loop_time + car_params::actuation_latency;
   
@@ -206,7 +208,16 @@ void Navigation::Run(){
 
   // If odometry has not been initialized, we can't do anything.
   if (!odom_initialized_) return;
-
+  //This function gets called 20 times a second to form the control loop.
+  static astar::Astar global_planner(collision_map_);
+  Eigen::Vector2f start(robot_loc_);
+  Eigen::Vector2f end{robot_loc_.x() + 1, robot_loc_.y() + 8};
+  visualization::DrawCross(start, 0.25,0xfc4103,global_viz_msg_);
+  visualization::DrawCross(end, 0.25,0xfc4103,global_viz_msg_);
+  if(global_planner.AstarSearch(collision_map_, collision_map_.GetIndexPairFromDist(robot_loc_), collision_map_.GetIndexPairFromDist(end))) {
+    global_planner.tracePath(global_viz_msg_ , collision_map_, collision_map_.GetIndexPairFromDist(end));
+  }
+  
   //Latency Compensation
   obstacle_avoidance::CleanVelocityBuffer(vel_commands_, std::min(odom_stamp_, point_cloud_stamp_));
 
@@ -303,7 +314,7 @@ void Navigation::Run(){
   //obstacle_avoidance::VisualizeObstacleAvoidanceInfo(goal_point,path_options,best_path,local_viz_msg_);
   
   // 7) Publish commands with 1-D TOC, update vector of previous vehicle commands
-  TimeOptimalControl(best_path);
+  // TimeOptimalControl(best_path);
     
   CommandStamped drive_cmd(drive_msg_.velocity, drive_msg_.curvature, drive_msg_.header.stamp.toNSec() + car_params::actuation_latency);
   vel_commands_.push_back(drive_cmd);
@@ -315,6 +326,8 @@ void Navigation::Run(){
   // Publish messages.
   viz_pub_.publish(local_viz_msg_);
   viz_pub_.publish(global_viz_msg_);
+
+  sleep(30);
 }
 
 }  // namespace navigation
