@@ -23,6 +23,7 @@
 
 #include "vector_map/vector_map.h"
 #include "cost_map/cost_map.h"
+#include "visualization/visualization.h"
 
 #include "eigen3/Eigen/Dense"
 #include "ros/ros.h"
@@ -99,6 +100,9 @@ class Navigation {
   // Use time optimal strategy to control the car
   void TimeOptimalControl(const PathOption& path);
 
+  // Implements pure pursuit algorithm
+  void PurePursuit(amrl_msgs::VisualizationMsg& msg);
+
   std::vector<CommandStamped> vel_commands_;
 
  private:
@@ -154,6 +158,7 @@ class Navigation {
 
   bool first_cycle = true;
 
+  void GetCollisionMap();
   void TransformPointCloud(TimeShiftedTF transform);
 };
 

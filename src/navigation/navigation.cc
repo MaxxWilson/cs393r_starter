@@ -18,7 +18,6 @@
 \author  Joydeep Biswas, (C) 2019
 */
 //========================================================================
-
 #include "gflags/gflags.h"
 #include "eigen3/Eigen/Dense"
 #include "eigen3/Eigen/Geometry"
@@ -32,7 +31,6 @@
 #include "shared/ros/ros_helpers.h"
 #include "visualization/visualization.h"
 #include "config_reader/config_reader.h"
-#include "navigation.h"
 
 #include "obstacle_avoidance/obstacle_avoidance.h"
 #include "obstacle_avoidance/car_params.h"
@@ -46,6 +44,8 @@ using std::vector;
 using namespace math_util;
 using namespace ros_helpers;
 
+CONFIG_FLOAT(pursuit_radius, "pursuit_radius");
+
 namespace {
 ros::Publisher drive_pub_;
 ros::Publisher viz_pub_;
@@ -57,8 +57,10 @@ const float kEpsilon = 1e-5;
 } //namespace
 
 namespace navigation {
-
-
+  static int x_a = 0;
+  static int x_b = 1;
+  static int y_a = 0;
+  static int y_b = 1;
 
 Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
     odom_initialized_(false),
@@ -80,7 +82,6 @@ Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
   InitRosHeader("base_link", &drive_msg_.header);
 
   vel_commands_ = std::vector<CommandStamped>(10);
-
   map_.Load(map_file);
   collision_map_ = costmap::CostMap();
 }
@@ -140,6 +141,9 @@ void Navigation::TimeOptimalControl(const PathOption& path) {
     drive_msg_.curvature = path.curvature;
     drive_msg_.velocity = set_speed;
 
+}
+
+void Navigation::TransformPointCloud(TimeShiftedTF transform){
   Eigen::Matrix2f R;
   R << cos(transform.theta), sin(transform.theta), -sin(transform.theta), cos(transform.theta);
 
@@ -155,7 +159,23 @@ void Navigation::GetCollisionMap(){
     for (size_t i = 0; i < map_.lines.size(); ++i) {
       const geometry::line2f line = map_.lines[i];
   }
+
+void Navigation::PurePursuit(amrl_msgs::VisualizationMsg& msg){
+    int x[5][2] = {{0,1}, {2,3}, {4,10}, {6, 14}, {7, 25}};
+    Eigen::Vector2f point_a = {x[x_a][1], x[y_a][2]};
+    Eigen::Vector2f point_b = {x[x_b][1], x[y_b][2]};
+    Eigen::Vector2f point_c = {x[x_a + 1][1], x[y_a + 1][2]};
+    Eigen::Vector2f point_d = {x[x_b + 1][1], x[y_b + 1][2]};
+
+    visualization::DrawLine(point_a, point_b, 0xfcba03, msg); // draws current local line to travel on
+    visualization::DrawLine(point_c, point_d, 0xfcba03, msg); // draws next local line to travel on
+
+    x_a = x_a + 1;
+    x_b = x_b + 1;
+    y_a = y_a + 1;
+    y_b = y_b + 1;
 }
+
 
 void Navigation::Run(){
   //This function gets called 20 times a second to form the control loop.
@@ -278,5 +298,5 @@ void Navigation::Run(){
   viz_pub_.publish(local_viz_msg_);
   viz_pub_.publish(global_viz_msg_);
 }
-
+    
 }  // namespace navigation
