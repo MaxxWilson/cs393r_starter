@@ -174,6 +174,7 @@ namespace astar {
         }
         return foundDest;
     }
+
     void Astar::tracePath(amrl_msgs::VisualizationMsg& msg, costmap::CostMap const& collision_map, Grid dest) {
         int row = dest.first;
         int col = dest.second;
@@ -200,5 +201,24 @@ namespace astar {
         }
     
         return;
+    }
+
+    void Astar::GeneratePathVector(costmap::CostMap const& collision_map, Grid dest){
+        int row = dest.first;
+        int col = dest.second;
+    
+        while (!(cellDetails[row][col].parent_i == row
+                && cellDetails[row][col].parent_j == col)) {
+            Eigen::Vector2f cur = collision_map.GetLocFromIndex(row, col);
+            path_vector_.insert(path_vector_.begin(), Eigen::Vector2f(cur));
+            int temp_row = cellDetails[row][col].parent_i;
+            int temp_col = cellDetails[row][col].parent_j;
+            row = temp_row;
+            col = temp_col;
+        }
+    }
+
+    std::vector<Eigen::Vector2f> Astar::GetPathVector(){
+        return this->path_vector_;
     }
 }

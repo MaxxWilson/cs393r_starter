@@ -23,6 +23,7 @@ namespace astar {
         bool** closedList;
         int ROW;
         int COL;
+        std::vector<Eigen::Vector2f> path_vector_;
     public:
         Astar(costmap::CostMap const& collision_map);
         ~Astar();
@@ -31,6 +32,8 @@ namespace astar {
         void InitializeClosedList(costmap::CostMap const& collision_map);
         void IntializeStart(Grid src);
         void tracePath(amrl_msgs::VisualizationMsg& msg, costmap::CostMap const& collision_map, Grid dest);
+        void GeneratePathVector(costmap::CostMap const& collision_map, Grid dest);
+        std::vector<Eigen::Vector2f> GetPathVector();
     };
 }
 

@@ -124,7 +124,13 @@ void Navigation::SetNavGoal(const Vector2f& loc, float angle) {
     global_planner.tracePath(global_viz_msg_ , collision_map_, collision_map_.GetIndexPairFromDist(end));
   }
   double end_time = GetMonotonicTime();
-  std::cout << "Global Planning Time: " << end_time - start_time << std::endl;
+  std::cout << "Global Planning Time: " << end_time - start_time << std::endl << std::endl;
+  
+  global_planner.GeneratePathVector(collision_map_, collision_map_.GetIndexPairFromDist(end));
+  std::vector<Eigen::Vector2f> global_plan = global_planner.GetPathVector();
+  for(int i = 0; i < global_plan.size(); i++){
+    visualization::DrawCross(global_plan[i], 0.02, 0xff0000, global_viz_msg_);
+  }
 }
 
 void Navigation::UpdateLocation(const Eigen::Vector2f& loc, float angle) {
