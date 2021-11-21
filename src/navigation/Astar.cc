@@ -36,6 +36,15 @@ namespace astar {
         return (row >= 0) && (row < collision_map.GetRowNum()) && (col >= 0)
             && (col < collision_map.GetColNum());
     }
+    bool isNearObstacle(int r, int c, costmap::CostMap const& collision_map) {
+        for(int i = 0; i < 8; i++) {
+            int newR = r + dirs[i][0];
+            int newC = c + dirs[i][1];
+            if(!isValid(newR, newC, collision_map)) return true;
+            if(!isUnBlocked(collision_map, newR, newC)) return true;
+        }
+        return false;
+    }
     bool isUnBlocked(costmap::CostMap const& collision_map, int row, int col)
     {
         return abs((collision_map.GetValueAtIdx(row, col) - 1.0)) > 1e-4;
@@ -130,6 +139,7 @@ namespace astar {
             for(int i = 0; i < 8; i++) {
                 int newR = r + dirs[i][0];
                 int newC = c + dirs[i][1];
+                if(!isValid(newR, newC, collision_map)) continue;
                 // printf("new Node:(%d,%d)\n", newR, newC);
                 if (isDestination(newR, newC, dest) == true) {
                     // Set the Parent of the destination cell
@@ -148,15 +158,9 @@ namespace astar {
                     }
                     double hNew = getHValue(newR, newC, dest);
                     double fNew = gNew + hNew;
-    
-                    // If it isn’t on the open list, add it to
-                    // the open list. Make the current square
-                    // the parent of this square. Record the
-                    // f, g, and h costs of the square cell
-                    //                OR
-                    // If it is on the open list already, check
-                    // to see if this path to that square is
-                    // better, using 'f' cost as the measure.
+                    if(isNearObstacle(newR, newC, collision_map)) {
+                        fNew += 2;
+                    }
                     if (cellDetails[newR][newC].f == FLT_MAX
                         || cellDetails[newR][newC].f > fNew) {
                         openList.insert(std::make_pair(
