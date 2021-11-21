@@ -11,5 +11,6 @@ map_length_dist = 50
 row_num = 2*(map_length_dist)/dist_res + 1
 
 -- Pure Pursuit --
-pursuit_radius = 0.5 --meters
+pursuit_radius = 0.75 --meters
+goal_threshold = 0.5
 

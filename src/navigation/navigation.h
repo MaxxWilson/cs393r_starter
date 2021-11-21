@@ -100,12 +100,9 @@ class Navigation {
   void TimeOptimalControl(const PathOption& path);
 
   // Implements pure pursuit algorithm
-  void PurePursuit(amrl_msgs::VisualizationMsg &msg);
-
-void FindLineCircleIntersect(float circle_radius, 
-                                                    Eigen::Vector2f circle_center,
-                                                    Eigen::Vector2f line_point_a,
-                                                    Eigen::Vector2f line_point_b);
+  Eigen::Vector2f PurePursuit();
+  bool pointIsInCircle(Eigen::Vector2f point, Eigen::Vector2f circle_center, double radius);
+  bool IsIntersectingCircle(Eigen::Vector2f point_1, Eigen::Vector2f point_2, Eigen::Vector2f& intersection_point);
 
   std::vector<CommandStamped> vel_commands_;
 
@@ -154,11 +151,14 @@ void FindLineCircleIntersect(float circle_radius,
   costmap::CostMap collision_map_;
 
   // Whether navigation is complete.
-  bool nav_complete_;
+  bool nav_complete_ = true;
   // Navigation goal location.
   Eigen::Vector2f nav_goal_loc_;
   // Navigation goal angle.
   float nav_goal_angle_;
+
+  int curr_wpt_index_ = 0;
+  std::vector<Eigen::Vector2f> global_plan_;
 
   bool first_cycle = true;
 

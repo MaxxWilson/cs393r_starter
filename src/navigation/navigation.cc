@@ -63,7 +63,6 @@ const float kEpsilon = 1e-5;
 const float dist_res = 0.1;
 const float map_length_dist = 50;
 const float row_num = 2*(map_length_dist)/dist_res + 1;
-const float pursuit_radius = 0.5;
 } //namespace
 
 namespace navigation {
@@ -74,6 +73,8 @@ namespace navigation {
 
 
 CONFIG_INT(row_num, "row_num");
+CONFIG_FLOAT(pursuit_radius, "pursuit_radius");
+CONFIG_FLOAT(goal_threshold, "goal_threshold");
 
 
 Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
@@ -131,16 +132,19 @@ void Navigation::SetNavGoal(const Vector2f& loc, float angle) {
   std::cout << "Global Planning Time: " << end_time - start_time << std::endl << std::endl;
   
   global_planner.GeneratePathVector(collision_map_, collision_map_.GetIndexPairFromDist(end));
-  std::vector<Eigen::Vector2f> global_plan = global_planner.GetPathVector();
-  for(int i = 0; i < global_plan.size(); i++){
-    visualization::DrawCross(global_plan[i], 0.02, 0xff0000, global_viz_msg_);
-  }
+  global_plan_ = global_planner.GetPathVector();
+  // for(std::size_t i = 0; i < global_plan_.size(); i++){
+  //   visualization::DrawCross(global_plan_[i], 0.02, 0xff0000, global_viz_msg_);
+  // }
 
     //Changes pure pursuit iterator to original position when given new nav goal
   x_a = 0;
   x_b = 1;
   y_a = 0;
   y_b = 1;
+
+  nav_complete_ = false;
+  curr_wpt_index_ = 0;
 }
 
 void Navigation::UpdateLocation(const Eigen::Vector2f& loc, float angle) {
@@ -194,7 +198,6 @@ void Navigation::TimeOptimalControl(const PathOption& path) {
     drive_msg_.header.stamp = ros::Time::now();
     drive_msg_.curvature = path.curvature;
     drive_msg_.velocity = set_speed;
-    drive_pub_.publish(drive_msg_);
 }
 
 void Navigation::TransformPointCloud(TimeShiftedTF transform){
@@ -209,57 +212,126 @@ void Navigation::TransformPointCloud(TimeShiftedTF transform){
   }
 }
 
-// // void Navigation::PurePursuit(amrl_msgs::VisualizationMsg& msg){
-// //     int x[5][2] = {{0,1}, {2,3}, {4,10}, {6, 14}, {7, 25}};
-// //     Eigen::Vector2f point_a = {x[x_a][1], x[y_a][2]};//starting point of current line on local path
-// //     Eigen::Vector2f point_b = {x[x_b][1], x[y_b][2]};//ending point of current line on local path
-// //     Eigen::Vector2f point_c = {x[x_a + 1][1], x[y_a + 1][2]};//starting point of next line on local path
-// //     Eigen::Vector2f point_d = {x[x_b + 1][1], x[y_b + 1][2]};//ending point of next line on local path
+Eigen::Vector2f Navigation::PurePursuit(){
+  Eigen::Vector2f goal_point(0, 0);
+  while(!IsIntersectingCircle(global_plan_[curr_wpt_index_], global_plan_[curr_wpt_index_+1], goal_point) && curr_wpt_index_ < global_plan_.size()){
+    curr_wpt_index_++;
+  }
+  if(curr_wpt_index_ == global_plan_.size()){
+    goal_point = global_plan_.back();
+  }
+  return goal_point;
 
-// //     visualization::DrawLine(point_a, point_b, 0xfcba03, msg); // draws current local line to travel on
-// //     visualization::DrawLine(point_c, point_d, 0xfcba03, msg); // draws next local line to travel on
+    // float x[5][2] = {{0.1,0.1}, {0.0,0.6}, {4.0, 10.0}, {9.0, 15.0}, {20.0, 19.0}};
 
-// //     x_a = x_a + 1;
-// //     x_b = x_b + 1;
-// //     y_a = y_a + 1;
-// //     y_b = y_b + 1;
-// // }
+    // Eigen::Vector2f point_a(x[x_a][0], x[y_a][1]);
+    // Eigen::Vector2f zeroes(0, 0);
 
+    // Eigen::Vector2f point_b(x[x_b][0], x[y_b][1]);
 
+    // float pursuit_radius = 0.5;
 
-void Navigation::PurePursuit(amrl_msgs::VisualizationMsg &msg){
-    float x[5][2] = {{0.1,0.1}, {0.0,0.6}, {4.0, 10.0}, {9.0, 15.0}, {20.0, 19.0}};
+    // Eigen::Vector2f point_c(x[x_a + 1][0], x[y_a + 1][1]); // same as point b
+    // Eigen::Vector2f point_d(x[x_b + 1][0], x[y_b + 1][1]);
 
-    Eigen::Vector2f point_a(x[x_a][0], x[y_a][1]);
-    Eigen::Vector2f zeroes(0, 0);
+    // visualization::DrawLine(point_a, point_b, 0xfcba03, msg); // draws current local line to travel on in yellow
+    // visualization::DrawLine(point_c, point_d, 0xfcba03, msg); // draws next local line to travel on in yellow
 
-    Eigen::Vector2f point_b(x[x_b][0], x[y_b][1]);
+    // Eigen::Vector2f temp(0,0);
+    // float temp_norm = temp.norm();
 
-    float pursuit_radius = 0.5;
+    // bool is_in_circle = geometry::FurthestFreePointCircle(point_a, point_b, zeroes, pursuit_radius, &temp_norm, &temp);
+    // if(is_in_circle){
 
-    Eigen::Vector2f point_c(x[x_a + 1][0], x[y_a + 1][1]); // same as point b
-    Eigen::Vector2f point_d(x[x_b + 1][0], x[y_b + 1][1]);
+    // }
+}
 
-    visualization::DrawLine(point_a, point_b, 0xfcba03, msg); // draws current local line to travel on in yellow
-    visualization::DrawLine(point_c, point_d, 0xfcba03, msg); // draws next local line to travel on in yellow
-    visualization::DrawArc(robot_loc_, pursuit_radius, 0, 360, 0xfcba03, msg); // draws pure pursuit circle
+bool Navigation::pointIsInCircle(Eigen::Vector2f point, Eigen::Vector2f circle_center, double radius){
+  return (point - circle_center).norm() < radius;
+}
 
-    Eigen::Vector2f temp(0,0);
-    float temp_norm = temp.norm();
+bool Navigation::IsIntersectingCircle(Eigen::Vector2f point_1, Eigen::Vector2f point_2, Eigen::Vector2f& intersection_point){
+  bool p1InCircle = pointIsInCircle(point_1, robot_loc_, CONFIG_pursuit_radius);
+  bool p2InCircle = pointIsInCircle(point_2, robot_loc_, CONFIG_pursuit_radius);
 
-    bool is_in_circle = geometry::FurthestFreePointCircle(point_a, point_b, zeroes, pursuit_radius, &temp_norm, &temp);
-    if(is_in_circle){
+  if(p1InCircle && p2InCircle){
+    return false;
+  }
+  if(!p1InCircle && !p2InCircle && !pointIsInCircle(geometry::ProjectPointOntoLine(robot_loc_, point_1, point_2), robot_loc_, CONFIG_pursuit_radius)){
+    return false;
+  }
+  
+  //equation of a line parameters
+  float m = (point_2.y() - point_1.y()) / (point_2.x() - point_1.x());
+  float b = point_2.y() - m * point_2.x(); 
 
+  //Center of pursuit circle coordinates
+  float cx = robot_loc_.x();
+  float cy = robot_loc_.y();
+
+  //Calculates squares of variables
+  float r2 = math_util::Pow(CONFIG_pursuit_radius, 2);
+  float m2 = math_util::Pow(m, 2);
+  float cx2 = math_util::Pow(cx, 2);
+  float cy2 = math_util::Pow(cy, 2);
+  float b2 = math_util::Pow(b, 2);
+
+  //Intersection solution points
+  float x1_sol;
+  float x2_sol;
+  float y1_sol;
+  float y2_sol;
+
+  //Quadratic Formula parameters solving for x intersection values
+  float aqx = 1 + m2;
+  float bqx = 2*(m*b - m*cy - cx);
+  float cqx = cx2 + cy2 + b2 - 2 * cy * b - r2;
+
+  int root_num = math_util::SolveQuadratic(aqx, bqx, cqx, &x1_sol, &x2_sol);
+
+  if(root_num == 0){
+    return false;
+  }
+  else if(root_num == 1){
+    float y = m*x1_sol+b;
+    intersection_point = Eigen::Vector2f(x1_sol, y);
+    return true;
+  }
+  else if(root_num == 2){
+    float y1 = m*x1_sol+b;
+    float y2 = m*x2_sol+b;
+
+    if(geometry::IsBetween(point_1, point_2, Eigen::Vector2f(x1_sol, y1), (float) 0.001)){
+      intersection_point = Eigen::Vector2f(x1_sol, y1);
     }
-      std::cout << point_a.x() << ", " << point_a.y() << std::endl;
-      std::cout << point_b.x() << ", " << point_b.y() << std::endl;
-      std::cout << "returns: " << is_in_circle << "\n";
-      std::cout << temp.x() << ", " << temp.y() << std::endl << std::endl;
+    else if(geometry::IsBetween(point_1, point_2, Eigen::Vector2f(x2_sol, y2), (float) 0.001)){
+      intersection_point = Eigen::Vector2f(x2_sol, y2);
+    }
+    return true;
+  }
 
-    x_a = x_a + 1;
-    x_b = x_b + 1;
-    y_a = y_a + 1;
-    y_b = y_b + 1;
+  //checks if x1_sol or x2_sol do not exist on bounded line segment 
+  if(x1_sol > point_2.x() || x1_sol < point_1.x()){//if either x1_sol is greater than x line segment or less than x line segment
+    intersection_point.x() = x2_sol;
+  }
+  else if(x2_sol > point_2.x() || x2_sol < point_1.x()){//if either x2_sol is greater than x line segment or less than x line segment
+    intersection_point.x() = x1_sol;
+  }
+  
+  //Quadratic Formula parameters solving for y intersection values
+  float aqy = 1 + m2;
+  float bqy = 2 * b - 2 * m * cx;
+  float cqy = b2 - 2 * m * cx * b + m2 * cx2 - 2 * cy * m2 + cy2 * m2 - r2 * m2;
+
+  math_util::SolveQuadratic(aqy, bqy, cqy, &y1_sol, &y2_sol);
+  //checks if y1_sol or y2_sol do not exist on bounded line segment 
+  if(y1_sol > point_2.y() || y1_sol < point_1.y()){//if either y1_sol is greater than y line segment or less than y line segment
+    intersection_point.y() = y2_sol;
+  }
+  else if(y2_sol > point_2.y() || y2_sol < point_1.y()){//if either y2_sol is greater than y line segment or less than y line segment
+    intersection_point.y() = y1_sol;
+  }
+  return true;
 }
 
 void Navigation::Run(){
@@ -273,8 +345,9 @@ void Navigation::Run(){
 
   // If odometry has not been initialized, we can't do anything.
   if (!odom_initialized_) return;
-  //This function gets called 20 times a second to form the control loop.
+  if (nav_complete_) return;
   
+  //This function gets called 20 times a second to form the control loop.
   //Latency Compensation
   obstacle_avoidance::CleanVelocityBuffer(vel_commands_, std::min(odom_stamp_, point_cloud_stamp_));
 
@@ -335,9 +408,24 @@ void Navigation::Run(){
   // Visualize Latency Compensation
   //obstacle_avoidance::LatencyPointCloud(local_viz_msg_, transformed_point_cloud_);
   //obstacle_avoidance::DrawCarLocal(local_viz_msg_, odom_state_tf.position, odom_state_tf.theta);
-  PurePursuit(local_viz_msg_);
+
+
+  if((robot_loc_ - global_plan_.back()).norm() < CONFIG_goal_threshold){
+    nav_complete_ = true;
+    drive_msg_.curvature = 0;
+    drive_msg_.velocity = 0;
+    drive_pub_.publish(drive_msg_);
+    return;
+  }
+
   // "Carrot on a stick" goal point, and resulting goal curvature
-  Eigen::Vector2f goal_point(4, 0.0);
+  Eigen::Vector2f goal_point = Eigen::Rotation2D<float>(-robot_angle_)*(PurePursuit() - robot_loc_);
+
+  visualization::DrawArc(Eigen::Vector2f(0, 0), CONFIG_pursuit_radius, 0, 2*M_PI, 0xfcba03, local_viz_msg_); // draws pure pursuit circle
+  visualization::DrawCross(goal_point, 0.2, 0xFF0000, local_viz_msg_);
+  if(goal_point.norm() == 0){
+    return;
+  }
   float goal_curvature = obstacle_avoidance::GetCurvatureFromGoalPoint(goal_point);
   goal_curvature = Clamp(goal_curvature, car_params::min_curvature, car_params::max_curvature);
 
@@ -371,7 +459,7 @@ void Navigation::Run(){
   //obstacle_avoidance::VisualizeObstacleAvoidanceInfo(goal_point,path_options,best_path,local_viz_msg_);
   
   // 7) Publish commands with 1-D TOC, update vector of previous vehicle commands
-  // TimeOptimalControl(best_path);
+  TimeOptimalControl(best_path);
     
   CommandStamped drive_cmd(drive_msg_.velocity, drive_msg_.curvature, drive_msg_.header.stamp.toNSec() + car_params::actuation_latency);
   vel_commands_.push_back(drive_cmd);
@@ -379,11 +467,11 @@ void Navigation::Run(){
   // Add timestamps to all messages.
   local_viz_msg_.header.stamp = ros::Time::now();
   global_viz_msg_.header.stamp = ros::Time::now();
-
+  
   // Publish messages.
   viz_pub_.publish(local_viz_msg_);
   viz_pub_.publish(global_viz_msg_);
-
+  drive_pub_.publish(drive_msg_);
   //sleep(30);
 }
     
