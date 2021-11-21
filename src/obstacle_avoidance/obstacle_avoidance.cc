@@ -247,11 +247,14 @@ struct navigation::PathOption ChooseBestPath(std::vector<navigation::PathOption>
     double best_score = -DBL_MAX;
     for(auto& path:paths){
         double distance_to_goal = GetDistanceToGoal(path,goal);
-        // if(abs(path.curvature)<1e-3) {
-        //     std::cout<<"curvature: "<<path.curvature<<", free_path_length: "<<path.free_path_length<<", clearance:"<<path.clearance<<", distance_to_goal"<<distance_to_goal<<std::endl;
-        //     std::cout<<"closest point: ("<<path.closest_point[0]<<","<<path.closest_point[1]<<")"<<std::endl;
-        // }
+
+        //std::cout<<"curvature: "<<path.curvature<<", free_path_length: "<<path.free_path_length<<", clearance:"<<path.clearance<<", distance_to_goal"<<distance_to_goal<<std::endl;
+
         double score = path.free_path_length + FLAGS_clearance_param * path.clearance + FLAGS_distance_goal_param * distance_to_goal;
+        /*
+        std::cout << "Path Length Score: " << path.free_path_length << std::endl;
+        std::cout << "Clearance Score: " << FLAGS_clearance_param * path.clearance << std::endl;
+        std::cout << "Dist To Goal Score: " << FLAGS_distance_goal_param * distance_to_goal << std::endl << std::endl; */
         if(score>best_score){
             best_score = score;
             bestPath = &path;
