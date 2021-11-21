@@ -91,6 +91,8 @@ class Navigation {
   void ObservePointCloud(const std::vector<Eigen::Vector2f>& cloud,
                          uint64_t time);
 
+  void Replan();
+
   // Main function called continously from main
   void Run();
   // Used to set the next target pose.
@@ -100,7 +102,7 @@ class Navigation {
   void TimeOptimalControl(const PathOption& path);
 
   // Implements pure pursuit algorithm
-  Eigen::Vector2f PurePursuit();
+  bool PurePursuit(Eigen::Vector2f &goal_point);
   bool pointIsInCircle(Eigen::Vector2f point, Eigen::Vector2f circle_center, double radius);
   bool IsIntersectingCircle(Eigen::Vector2f point_1, Eigen::Vector2f point_2, Eigen::Vector2f& intersection_point);
 
@@ -157,7 +159,6 @@ class Navigation {
   // Navigation goal angle.
   float nav_goal_angle_;
 
-  int curr_wpt_index_ = 0;
   std::vector<Eigen::Vector2f> global_plan_;
 
   bool first_cycle = true;
