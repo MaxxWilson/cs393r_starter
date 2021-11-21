@@ -34,7 +34,6 @@
 #include "navigation.h"
 #include "Astar.h"
 #include "obstacle_avoidance/obstacle_avoidance.h"
-#include "obstacle_avoidance/car_params.h"
 #include "visualization/CImg.h"
 
 #include <utility>
@@ -69,6 +68,20 @@ namespace navigation {
 CONFIG_INT(row_num, "row_num");
 CONFIG_FLOAT(pursuit_radius, "pursuit_radius");
 CONFIG_FLOAT(goal_threshold, "goal_threshold");
+
+CONFIG_FLOAT(num_curves, "num_curves");
+CONFIG_UINT(sensing_latency, "sensing_latency");
+CONFIG_UINT(actuation_latency, "actuation_latency");
+
+CONFIG_FLOAT(min_acceleration, "min_acceleration");
+CONFIG_FLOAT(safe_distance, "safe_distance");
+CONFIG_FLOAT(max_velocity, "max_velocity");
+
+CONFIG_FLOAT(min_curvature, "min_curvature");
+CONFIG_FLOAT(max_curvature, "max_curvature");
+CONFIG_FLOAT(curvature_increment, "curvature_increment");
+
+CONFIG_FLOAT(max_path_length, "max_path_length");
 
 Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
     odom_initialized_(false),
@@ -133,7 +146,7 @@ void Navigation::UpdateOdometry(const Vector2f& loc,
     odom_initialized_ = true;
     odom_loc_ = loc;
     odom_angle_ = angle;
-    odom_stamp_ = time - car_params::sensing_latency;
+    odom_stamp_ = time - CONFIG_sensing_latency;
     return;
   }
   odom_loc_ = loc;
@@ -141,7 +154,7 @@ void Navigation::UpdateOdometry(const Vector2f& loc,
 
   //std::cout << "omega, vel, loc, angle: " << ang_vel << ", " << robot_vel_[0] << ", " << loc << ", " << angle << std::endl;
 
-  odom_stamp_ = time - car_params::sensing_latency;
+  odom_stamp_ = time - CONFIG_sensing_latency;
   last_odom_stamp_ = odom_stamp_;
   //std::cout << "odom stamp: " << odom_stamp_ << std::endl;
   has_new_odom_ = true;
@@ -150,15 +163,15 @@ void Navigation::UpdateOdometry(const Vector2f& loc,
 void Navigation::ObservePointCloud(const vector<Vector2f>& cloud,
                                    uint64_t time) {
   point_cloud_ = cloud;
-  point_cloud_stamp_ = time - car_params::sensing_latency;
+  point_cloud_stamp_ = time - CONFIG_sensing_latency;
   has_new_points_= true;
 }
 
 //Solve the TOC Problem
 void Navigation::TimeOptimalControl(const PathOption& path) {
     double current_speed = odom_state_tf.speed;
-    double min_stop_distance = car_params::safe_distance-0.5*current_speed*current_speed/car_params::min_acceleration; //calculate the minimum stopping distance at current velocity
-    double set_speed = (path.free_path_length>min_stop_distance)?car_params::max_velocity:0; //decelerate if free path is is smaller than minimum stopping distance otherwise accelerate
+    double min_stop_distance = CONFIG_safe_distance-0.5*current_speed*current_speed/CONFIG_min_acceleration; //calculate the minimum stopping distance at current velocity
+    double set_speed = (path.free_path_length>min_stop_distance)?CONFIG_max_velocity:0; //decelerate if free path is is smaller than minimum stopping distance otherwise accelerate
     
     // Publish command to topic 
     drive_msg_.header.seq++;
@@ -339,7 +352,7 @@ bool Navigation::IsIntersectingCircle(Eigen::Vector2f point_1, Eigen::Vector2f p
 void Navigation::Run(){
   
   uint64_t start_loop_time = ros::Time::now().toNSec();
-  uint64_t actuation_time = start_loop_time + car_params::actuation_latency;
+  uint64_t actuation_time = start_loop_time + CONFIG_actuation_latency;
   
   // Clear previous visualizations.
   visualization::ClearVisualizationMsg(local_viz_msg_);
@@ -432,21 +445,21 @@ void Navigation::Run(){
   visualization::DrawCross(goal_point, 0.2, 0xFF0000, local_viz_msg_);
 
   float goal_curvature = obstacle_avoidance::GetCurvatureFromGoalPoint(goal_point);
-  goal_curvature = Clamp(goal_curvature, car_params::min_curvature, car_params::max_curvature);
+  goal_curvature = Clamp(goal_curvature, CONFIG_min_curvature, CONFIG_max_curvature);
 
   // 4) Generate range of possible paths centered on goal_curvature, using std::vector<struct PathOption>
-  static std::vector<struct PathOption> path_options(car_params::num_curves);
+  static std::vector<struct PathOption> path_options(floor(CONFIG_num_curves) + 1);
 
   // 5) For possible paths and point_cloud:
   for(std::size_t curve_index = 0; curve_index < path_options.size(); curve_index++){
-    float curvature = obstacle_avoidance::GetCurvatureOptionFromRange(curve_index, goal_curvature, car_params::min_curvature, car_params::curvature_increment);
+    float curvature = obstacle_avoidance::GetCurvatureOptionFromRange(curve_index, goal_curvature, CONFIG_min_curvature, CONFIG_curvature_increment);
     
     // Initialize path_option and collision bounds for curvature
     obstacle_avoidance::PathBoundaries collision_bounds(abs(curvature));
     path_options[curve_index] = navigation::PathOption{
       curvature,                    // curvature
       10,                           // default clearance
-      car_params::max_path_length,  // free Path Length
+      CONFIG_max_path_length,  // free Path Length
       Eigen::Vector2f(0, 0),        // obstacle point
       Eigen::Vector2f(0, 0)};       // closest point
 
@@ -466,7 +479,7 @@ void Navigation::Run(){
   // 7) Publish commands with 1-D TOC, update vector of previous vehicle commands
   TimeOptimalControl(best_path);
     
-  CommandStamped drive_cmd(drive_msg_.velocity, drive_msg_.curvature, drive_msg_.header.stamp.toNSec() + car_params::actuation_latency);
+  CommandStamped drive_cmd(drive_msg_.velocity, drive_msg_.curvature, drive_msg_.header.stamp.toNSec() + CONFIG_actuation_latency);
   vel_commands_.push_back(drive_cmd);
 
   // Add timestamps to all messages.

@@ -25,12 +25,31 @@
 
 #include "navigation/navigation.h"
 #include "visualization/visualization.h"
-#include "obstacle_avoidance/car_params.h"
 
 #ifndef OBSTACLE_AVOIDANCE_H
 #define OBSTACLE_AVOIDANCE_H
 
 namespace obstacle_avoidance{
+
+CONFIG_FLOAT(length, "length");
+CONFIG_FLOAT(width, "width");
+CONFIG_FLOAT(wheel_base, "wheel_base");
+CONFIG_FLOAT(safety_margin, "safety_margin");
+
+CONFIG_FLOAT(dist_to_front_bumper, "dist_to_front_bumper");
+CONFIG_FLOAT(dist_to_side_bumper, "dist_to_side_bumper");
+CONFIG_FLOAT(dist_to_rear_bumper, "dist_to_rear_bumper");
+
+CONFIG_FLOAT(min_acceleration, "min_acceleration");
+CONFIG_FLOAT(max_acceleration, "max_acceleration");
+
+CONFIG_FLOAT(max_path_length, "max_path_length");
+CONFIG_FLOAT(clearance_factor, "clearance_factor");
+
+CONFIG_FLOAT(clearance_gain, "clearance_gain");
+CONFIG_FLOAT(dist_goal_gain, "dist_goal_gain");
+
+CONFIG_UINT(sys_latency, "sys_latency");
 
 /**
  * struct to contain the radii which define different collision zones.
@@ -47,15 +66,15 @@ struct PathBoundaries{
         this->curvature = curvature;
 
         if(abs(curvature) > 1e-5){
-            this->min_radius = 1/this->curvature - car_params::width/2 - car_params::safety_margin;
+            this->min_radius = 1/this->curvature - CONFIG_width/2 - CONFIG_safety_margin;
 
             this->boundary_radius = hypot(
-            car_params::dist_to_front_bumper,
-            1/this->curvature - car_params::width/2 - car_params::safety_margin);
+            CONFIG_dist_to_front_bumper,
+            1/this->curvature - CONFIG_width/2 - CONFIG_safety_margin);
             
             this->max_radius = hypot(
-            car_params::dist_to_front_bumper,
-            1/this->curvature + car_params::width/2 + car_params::safety_margin);
+            CONFIG_dist_to_front_bumper,
+            1/this->curvature + CONFIG_width/2 + CONFIG_safety_margin);
         }
     }
 };
