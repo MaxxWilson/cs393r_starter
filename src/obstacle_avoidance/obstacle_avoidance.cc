@@ -246,15 +246,12 @@ struct navigation::PathOption ChooseBestPath(std::vector<navigation::PathOption>
     navigation::PathOption* bestPath = NULL;
     double best_score = -DBL_MAX;
     for(auto& path:paths){
-        double distance_to_goal = GetDistanceToGoal(path,goal);
+        path.dist_to_goal = GetDistanceToGoal(path,goal);
 
         //std::cout<<"curvature: "<<path.curvature<<", free_path_length: "<<path.free_path_length<<", clearance:"<<path.clearance<<", distance_to_goal"<<distance_to_goal<<std::endl;
 
-        double score = path.free_path_length + CONFIG_clearance_gain * path.clearance + CONFIG_dist_goal_gain * distance_to_goal;
-        /*
-        std::cout << "Path Length Score: " << path.free_path_length << std::endl;
-        std::cout << "Clearance Score: " << CONFIG_clearance_gain * path.clearance << std::endl;
-        std::cout << "Dist To Goal Score: " << CONFIG_dist_goal_gain * distance_to_goal << std::endl << std::endl; */
+        double score = path.free_path_length + CONFIG_clearance_gain * path.clearance + CONFIG_dist_goal_gain * path.dist_to_goal;
+        
         if(score>best_score){
             best_score = score;
             bestPath = &path;
@@ -306,7 +303,7 @@ void SelectedPathOutliner(const navigation::PathOption& selected_path,amrl_msgs:
 }
 // Draw goal [Red Cross]
 void GoalOutliner(Eigen::Vector2f& goal, amrl_msgs::VisualizationMsg& msg){
-    visualization::DrawCross(goal,0.5,0xfc4103,msg);
+    visualization::DrawCross(goal,0.5, 0x0000FF,msg);
 }
 
 void CleanVelocityBuffer(std::vector<navigation::CommandStamped> &v, uint64_t time){

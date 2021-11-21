@@ -83,6 +83,9 @@ CONFIG_FLOAT(curvature_increment, "curvature_increment");
 
 CONFIG_FLOAT(max_path_length, "max_path_length");
 
+CONFIG_FLOAT(clearance_gain, "clearance_gain");
+CONFIG_FLOAT(dist_goal_gain, "dist_goal_gain");
+
 Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
     odom_initialized_(false),
     localization_initialized_(false),
@@ -442,7 +445,7 @@ void Navigation::Run(){
   }
   
   visualization::DrawArc(Eigen::Vector2f(0, 0), CONFIG_pursuit_radius, 0, 2*M_PI, 0xfcba03, local_viz_msg_); // draws pure pursuit circle
-  visualization::DrawCross(goal_point, 0.2, 0xFF0000, local_viz_msg_);
+  visualization::DrawCross(goal_point, 0.25, 0xFF0000, local_viz_msg_);
 
   float goal_curvature = obstacle_avoidance::GetCurvatureFromGoalPoint(goal_point);
   goal_curvature = Clamp(goal_curvature, CONFIG_min_curvature, CONFIG_max_curvature);
@@ -459,7 +462,8 @@ void Navigation::Run(){
     path_options[curve_index] = navigation::PathOption{
       curvature,                    // curvature
       10,                           // default clearance
-      CONFIG_max_path_length,  // free Path Length
+      CONFIG_max_path_length,       // free Path Length
+      0.0,                          // dist to goal
       Eigen::Vector2f(0, 0),        // obstacle point
       Eigen::Vector2f(0, 0)};       // closest point
 
@@ -473,7 +477,12 @@ void Navigation::Run(){
   }
 
   // 6) Select best path from scoring function
-  struct PathOption best_path = obstacle_avoidance::ChooseBestPath(path_options,goal_point);
+  struct PathOption best_path = obstacle_avoidance::ChooseBestPath(path_options, goal_point);
+
+  std::cout << "Path Length Score: " << best_path.free_path_length << std::endl;
+  std::cout << "Clearance Score: " << CONFIG_clearance_gain * best_path.clearance << std::endl;
+  std::cout << "Dist To Goal Score: " << CONFIG_dist_goal_gain * best_path.dist_to_goal << std::endl << std::endl;
+
   obstacle_avoidance::VisualizeObstacleAvoidanceInfo(goal_point,path_options,best_path,local_viz_msg_);
   
   // 7) Publish commands with 1-D TOC, update vector of previous vehicle commands

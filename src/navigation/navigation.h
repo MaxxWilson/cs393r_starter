@@ -40,6 +40,7 @@ struct PathOption {
   float curvature;
   float clearance;
   float free_path_length;
+  float dist_to_goal;
   Eigen::Vector2f obstruction;
   Eigen::Vector2f closest_point;
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;

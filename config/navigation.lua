@@ -31,7 +31,7 @@ max_velocity = 1.25;
 
 -- Algorithmic Parameters --
 safe_distance = 0.10 -- safe distance used in TOC control, stops with 5" left to obstacle
-max_path_length = 7.0
+max_path_length = 8.0
 curvature_increment = 0.02
 num_curves = (max_curvature - min_curvature)/curvature_increment
 clearance_factor = width/2 + safety_margin + 0.1 -- ~6"
@@ -42,7 +42,7 @@ actuation_latency = 3*sys_latency/4;
 
 ----- Tunables -----
 -- Obstace Avoidance --
-clearance_gain = 10.0
+clearance_gain = 5.0
 dist_goal_gain = -5.0
 
 -- Pure Pursuit --
