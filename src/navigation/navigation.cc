@@ -34,12 +34,15 @@
 
 #include "obstacle_avoidance/obstacle_avoidance.h"
 #include "obstacle_avoidance/car_params.h"
+#include "visualization/CImg.h"
 
 using Eigen::Vector2f;
 using amrl_msgs::AckermannCurvatureDriveMsg;
 using amrl_msgs::VisualizationMsg;
 using std::string;
 using std::vector;
+using cimg_library::CImg;
+using cimg_library::CImgDisplay;
 
 using namespace math_util;
 using namespace ros_helpers;
@@ -54,6 +57,10 @@ VisualizationMsg global_viz_msg_;
 AckermannCurvatureDriveMsg drive_msg_;
 // Epsilon value for handling limited numerical precision.
 const float kEpsilon = 1e-5;
+const float dist_res = 0.1;
+const float map_length_dist = 50;
+const float row_num = 2*(map_length_dist)/dist_res + 1;
+const float pursuit_radius = 0.5;
 } //namespace
 
 namespace navigation {
@@ -61,6 +68,10 @@ namespace navigation {
   static int x_b = 1;
   static int y_a = 0;
   static int y_b = 1;
+
+// CONFIG_INT(row_num, "row_num");
+
+
 
 Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
     odom_initialized_(false),
@@ -84,9 +95,28 @@ Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
   vel_commands_ = std::vector<CommandStamped>(10);
   map_.Load(map_file);
   collision_map_ = costmap::CostMap();
+  collision_map_.ClearMap();
+  collision_map_.UpdateCollisionMap(map_.lines);
+  
+  CImg<float> image(row_num, row_num, 1,1,1);
+  float color = 0.2;
+
+  for(int x = 0; x < row_num; x++){
+    for(int y = 0; y < row_num; y++){
+      // Image coordinate frame is LHR
+      image.draw_point(x, row_num - y - 1, &color, collision_map_.GetValueAtIdx(x, y));
+    }
+  }
+
+  collision_map_.DisplayImage(image);
 }
 
 void Navigation::SetNavGoal(const Vector2f& loc, float angle) {
+  //Changes pure pursuit iterator to original position when given new nav goal
+  x_a = 0;
+  x_b = 1;
+  y_a = 0;
+  y_b = 1;
 }
 
 void Navigation::UpdateLocation(const Eigen::Vector2f& loc, float angle) {
@@ -140,7 +170,7 @@ void Navigation::TimeOptimalControl(const PathOption& path) {
     drive_msg_.header.stamp = ros::Time::now();
     drive_msg_.curvature = path.curvature;
     drive_msg_.velocity = set_speed;
-
+    drive_pub_.publish(drive_msg_);
 }
 
 void Navigation::TransformPointCloud(TimeShiftedTF transform){
@@ -159,23 +189,43 @@ void Navigation::GetCollisionMap(){
     for (size_t i = 0; i < map_.lines.size(); ++i) {
       const geometry::line2f line = map_.lines[i];
   }
+}
 
-void Navigation::PurePursuit(amrl_msgs::VisualizationMsg& msg){
-    int x[5][2] = {{0,1}, {2,3}, {4,10}, {6, 14}, {7, 25}};
-    Eigen::Vector2f point_a = {x[x_a][1], x[y_a][2]};
-    Eigen::Vector2f point_b = {x[x_b][1], x[y_b][2]};
-    Eigen::Vector2f point_c = {x[x_a + 1][1], x[y_a + 1][2]};
-    Eigen::Vector2f point_d = {x[x_b + 1][1], x[y_b + 1][2]};
 
-    visualization::DrawLine(point_a, point_b, 0xfcba03, msg); // draws current local line to travel on
-    visualization::DrawLine(point_c, point_d, 0xfcba03, msg); // draws next local line to travel on
+void Navigation::PurePursuit(amrl_msgs::VisualizationMsg &msg){
+    float x[5][2] = {{0.1,0.1}, {0.0,0.6}, {4.0, 10.0}, {9.0, 15.0}, {20.0, 19.0}};
+
+    Eigen::Vector2f point_a(x[x_a][0], x[y_a][1]);
+    Eigen::Vector2f zeroes(0, 0);
+
+    Eigen::Vector2f point_b(x[x_b][0], x[y_b][1]);
+
+    float pursuit_radius = 0.5;
+
+    Eigen::Vector2f point_c(x[x_a + 1][0], x[y_a + 1][1]); // same as point b
+    Eigen::Vector2f point_d(x[x_b + 1][0], x[y_b + 1][1]);
+
+    visualization::DrawLine(point_a, point_b, 0xfcba03, msg); // draws current local line to travel on in yellow
+    visualization::DrawLine(point_c, point_d, 0xfcba03, msg); // draws next local line to travel on in yellow
+    visualization::DrawArc(robot_loc_, pursuit_radius, 0, 360, 0xfcba03, msg); // draws pure pursuit circle
+
+    Eigen::Vector2f temp(0,0);
+    float temp_norm = temp.norm();
+
+    bool is_in_circle = geometry::FurthestFreePointCircle(point_a, point_b, zeroes, pursuit_radius, &temp_norm, &temp);
+    if(is_in_circle){
+
+    }
+      std::cout << point_a.x() << ", " << point_a.y() << std::endl;
+      std::cout << point_b.x() << ", " << point_b.y() << std::endl;
+      std::cout << "returns: " << is_in_circle << "\n";
+      std::cout << temp.x() << ", " << temp.y() << std::endl << std::endl;
 
     x_a = x_a + 1;
     x_b = x_b + 1;
     y_a = y_a + 1;
     y_b = y_b + 1;
 }
-
 
 void Navigation::Run(){
   //This function gets called 20 times a second to form the control loop.
@@ -249,7 +299,7 @@ void Navigation::Run(){
   // Visualize Latency Compensation
   //obstacle_avoidance::LatencyPointCloud(local_viz_msg_, transformed_point_cloud_);
   //obstacle_avoidance::DrawCarLocal(local_viz_msg_, odom_state_tf.position, odom_state_tf.theta);
-
+  PurePursuit(local_viz_msg_);
   // "Carrot on a stick" goal point, and resulting goal curvature
   Eigen::Vector2f goal_point(4, 0.0);
   float goal_curvature = obstacle_avoidance::GetCurvatureFromGoalPoint(goal_point);

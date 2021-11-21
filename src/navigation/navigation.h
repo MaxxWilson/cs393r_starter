@@ -21,7 +21,6 @@
 
 #include <vector>
 
-#include "vector_map/vector_map.h"
 #include "cost_map/cost_map.h"
 #include "visualization/visualization.h"
 
@@ -101,7 +100,12 @@ class Navigation {
   void TimeOptimalControl(const PathOption& path);
 
   // Implements pure pursuit algorithm
-  void PurePursuit(amrl_msgs::VisualizationMsg& msg);
+  void PurePursuit(amrl_msgs::VisualizationMsg &msg);
+
+void FindLineCircleIntersect(float circle_radius, 
+                                                    Eigen::Vector2f circle_center,
+                                                    Eigen::Vector2f line_point_a,
+                                                    Eigen::Vector2f line_point_b);
 
   std::vector<CommandStamped> vel_commands_;
 

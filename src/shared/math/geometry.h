@@ -402,7 +402,9 @@ bool RayIntersect(const Eigen::Matrix<T, 2, 1>& ray_source,
 }
 
 // Determines whether a ray intersects with a given circle
-
+//returns 0 if line does not intersect, 1 if it does intersect circle
+//sets free point to closest point on line segment to circle, and squared distance to norm
+//if returns 1, closest point is closes point on line segment in circle: the beginning of line
 template <typename T>
 bool FurthestFreePointCircle(const Eigen::Matrix<T, 2, 1>& line_start,
                              const Eigen::Matrix<T, 2, 1>& line_end,

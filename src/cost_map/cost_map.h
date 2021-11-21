@@ -21,6 +21,9 @@
 
 #include "eigen3/Eigen/Dense"
 #include "eigen3/Eigen/Geometry"
+
+#include "shared/math/line2d.h"
+#include "vector_map/vector_map.h"
 #include "visualization/CImg.h"
 
 #include <vector>
@@ -30,7 +33,6 @@ using cimg_library::CImgDisplay;
 
 #ifndef COST_MAP_H_
 #define COST_MAP_H_
-
 
 namespace costmap{
 
@@ -47,6 +49,8 @@ class CostMap{
         void DrawCostMap(CImg<float> &image);
         void DisplayImage(CImg<float> &image);
         
+        void UpdateCollisionMap(const std::vector<geometry::line2f> lines);
+
         void SetLikelihoodAtPosition(double x, double y, double likelihood);
         double GetLikelihoodAtPosition(double x, double y, bool normalized = true);
         int GetIndexFromDist(double dist);

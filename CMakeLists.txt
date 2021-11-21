@@ -60,9 +60,10 @@ ADD_EXECUTABLE(test_particle_filter
 TARGET_LINK_LIBRARIES(test_particle_filter shared_library ${libs})
 
 ROSBUILD_ADD_EXECUTABLE(navigation
+                        src/cost_map/cost_map.cc
                         src/navigation/navigation_main.cc
                         src/navigation/navigation.cc)
-TARGET_LINK_LIBRARIES(navigation shared_library obstacle_avoidance ${libs})
+TARGET_LINK_LIBRARIES(navigation shared_library obstacle_avoidance ${libs} X11)
 
 ADD_EXECUTABLE(eigen_tutorial
                src/eigen_tutorial.cc)

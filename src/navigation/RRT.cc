@@ -11,12 +11,16 @@ namespace RRT{
     {
         return (n1.xIdx == n2.xIdx) && (n1.yIdx == n2.yIdx);
     }
+    bool operator != (Node const& n1,Node const& n2)
+    {
+        return !(n1 == n2);
+    }
     bool IsNodeCollide(cosnt CostMap& collision_map, const Node& node) {
-        // TODO
-        return true;
+        if(collision_map.GetValueAtIdx(node.xIdx, node.yIdx) == 1.0) return true
+        return false;
     }
 
-    int RRT(cosnt CostMap& collision_map, const Node& start, const Node& end, list<Node*>& plan) {
+    int RRT(cosnt CostMap& collision_map, const Node& start, const Node& end, list<Node>& plan) {
         int xSize = collision_map.GetRowNum();
         int ySize = collision_map.GetColNum();
         vector<Node> graph;
@@ -28,11 +32,14 @@ namespace RRT{
             cnt++;
             Node newNode = CreateNewNode(xSize, ySize);
             if(IsNodeCollide(collision_map, newNode)) continue;
-            Node* nearestNode = FindNearestNode(newNode, graph); // newNode will be changed in FindNearestNode
+            Node* nearestNode = FindNearestNode(newNode, graph); 
             if((*nearestNode) == newNode) continue;
             newNode.parent = nearestNode;
             graph.push_back(newNode);
-            if(newNode == end) return 1;
+            if(newNode == end) {
+                ConstructPath(start, end, path);
+                return 1;
+            }
         }
         return 0;
     }
@@ -52,8 +59,15 @@ namespace RRT{
                 minDist = curDist;
             }
         }
-        // kinematic constraints
-
+        // TODO: control, change newNode
+        
         return nearestNode;
+    }
+    void ConstructPath(const Node& start, const Node& end, list<Node>& plan) {
+        const Node* cur = &end;
+        do {
+            plan.push_front(*cur);
+            cur = cur.parent;
+        } while((*cur) != start);
     }
 }
