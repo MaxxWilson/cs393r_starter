@@ -27,6 +27,7 @@
 #include "visualization/CImg.h"
 
 #include <vector>
+#include <utility>
 using std::vector;
 using cimg_library::CImg;
 using cimg_library::CImgDisplay;
@@ -52,9 +53,11 @@ class CostMap{
         void UpdateCollisionMap(const std::vector<geometry::line2f> lines);
 
         void SetLikelihoodAtPosition(double x, double y, double likelihood);
-        double GetLikelihoodAtPosition(double x, double y, bool normalized = true);
-        int GetIndexFromDist(double dist);
-        float RoundToResolution(float value, float res);
+        double GetLikelihoodAtPosition(double x, double y, bool normalized = true) const;
+        int GetIndexFromDist(double dist) const;
+        std::pair<int, int> GetIndexPairFromDist(Eigen::Vector2f loc) const;
+        Eigen::Vector2f GetLocFromIndex(int xIdx, int yIdx) const;
+        float RoundToResolution(float value, float res) const;
         void ClearMap();
         inline int GetRowNum() const {
             return cost_map_vector.size();
@@ -62,7 +65,7 @@ class CostMap{
         inline int GetColNum() const {
             return cost_map_vector[0].size();
         };
-        inline double GetValueAtIdx(int xIdx, int yIdx) {
+        inline double GetValueAtIdx(int xIdx, int yIdx) const{
             return cost_map_vector[xIdx][yIdx];
         }
     private:

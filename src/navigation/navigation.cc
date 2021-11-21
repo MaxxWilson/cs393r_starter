@@ -31,10 +31,13 @@
 #include "shared/ros/ros_helpers.h"
 #include "visualization/visualization.h"
 #include "config_reader/config_reader.h"
-
+#include "navigation.h"
+#include "Astar.h"
 #include "obstacle_avoidance/obstacle_avoidance.h"
 #include "obstacle_avoidance/car_params.h"
 #include "visualization/CImg.h"
+
+#include <utility>
 
 using Eigen::Vector2f;
 using amrl_msgs::AckermannCurvatureDriveMsg;
@@ -69,8 +72,8 @@ namespace navigation {
   static int y_a = 0;
   static int y_b = 1;
 
-// CONFIG_INT(row_num, "row_num");
 
+CONFIG_INT(row_num, "row_num");
 
 
 Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
@@ -98,21 +101,42 @@ Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
   collision_map_.ClearMap();
   collision_map_.UpdateCollisionMap(map_.lines);
   
-  CImg<float> image(row_num, row_num, 1,1,1);
+  CImg<float> image(CONFIG_row_num, CONFIG_row_num, 1,1,1);
   float color = 0.2;
 
-  for(int x = 0; x < row_num; x++){
-    for(int y = 0; y < row_num; y++){
+  for(int x = 0; x < CONFIG_row_num; x++){
+    for(int y = 0; y < CONFIG_row_num; y++){
       // Image coordinate frame is LHR
-      image.draw_point(x, row_num - y - 1, &color, collision_map_.GetValueAtIdx(x, y));
+      image.draw_point(x, CONFIG_row_num - y - 1, &color, collision_map_.GetValueAtIdx(x, y));
     }
   }
 
-  collision_map_.DisplayImage(image);
+  // collision_map_.DisplayImage(image);
 }
 
 void Navigation::SetNavGoal(const Vector2f& loc, float angle) {
-  //Changes pure pursuit iterator to original position when given new nav goal
+  double start_time = GetMonotonicTime();
+  visualization::ClearVisualizationMsg(global_viz_msg_);
+  astar::Astar global_planner(collision_map_);
+
+  Eigen::Vector2f start(robot_loc_);
+  Eigen::Vector2f end{loc.x(), loc.y()};
+
+  visualization::DrawCross(start, 0.25,0xfc4103,global_viz_msg_);
+  visualization::DrawCross(end, 0.25,0xfc4103,global_viz_msg_);
+  if(global_planner.AstarSearch(collision_map_, collision_map_.GetIndexPairFromDist(robot_loc_), collision_map_.GetIndexPairFromDist(end))) {
+    global_planner.tracePath(global_viz_msg_ , collision_map_, collision_map_.GetIndexPairFromDist(end));
+  }
+  double end_time = GetMonotonicTime();
+  std::cout << "Global Planning Time: " << end_time - start_time << std::endl << std::endl;
+  
+  global_planner.GeneratePathVector(collision_map_, collision_map_.GetIndexPairFromDist(end));
+  std::vector<Eigen::Vector2f> global_plan = global_planner.GetPathVector();
+  for(int i = 0; i < global_plan.size(); i++){
+    visualization::DrawCross(global_plan[i], 0.02, 0xff0000, global_viz_msg_);
+  }
+
+    //Changes pure pursuit iterator to original position when given new nav goal
   x_a = 0;
   x_b = 1;
   y_a = 0;
@@ -174,6 +198,7 @@ void Navigation::TimeOptimalControl(const PathOption& path) {
 }
 
 void Navigation::TransformPointCloud(TimeShiftedTF transform){
+
   Eigen::Matrix2f R;
   R << cos(transform.theta), sin(transform.theta), -sin(transform.theta), cos(transform.theta);
 
@@ -184,12 +209,22 @@ void Navigation::TransformPointCloud(TimeShiftedTF transform){
   }
 }
 
-void Navigation::GetCollisionMap(){
-  vector<vector<double>>();
-    for (size_t i = 0; i < map_.lines.size(); ++i) {
-      const geometry::line2f line = map_.lines[i];
-  }
-}
+// // void Navigation::PurePursuit(amrl_msgs::VisualizationMsg& msg){
+// //     int x[5][2] = {{0,1}, {2,3}, {4,10}, {6, 14}, {7, 25}};
+// //     Eigen::Vector2f point_a = {x[x_a][1], x[y_a][2]};//starting point of current line on local path
+// //     Eigen::Vector2f point_b = {x[x_b][1], x[y_b][2]};//ending point of current line on local path
+// //     Eigen::Vector2f point_c = {x[x_a + 1][1], x[y_a + 1][2]};//starting point of next line on local path
+// //     Eigen::Vector2f point_d = {x[x_b + 1][1], x[y_b + 1][2]};//ending point of next line on local path
+
+// //     visualization::DrawLine(point_a, point_b, 0xfcba03, msg); // draws current local line to travel on
+// //     visualization::DrawLine(point_c, point_d, 0xfcba03, msg); // draws next local line to travel on
+
+// //     x_a = x_a + 1;
+// //     x_b = x_b + 1;
+// //     y_a = y_a + 1;
+// //     y_b = y_b + 1;
+// // }
+
 
 
 void Navigation::PurePursuit(amrl_msgs::VisualizationMsg &msg){
@@ -228,17 +263,18 @@ void Navigation::PurePursuit(amrl_msgs::VisualizationMsg &msg){
 }
 
 void Navigation::Run(){
-  //This function gets called 20 times a second to form the control loop.
+  
   uint64_t start_loop_time = ros::Time::now().toNSec();
   uint64_t actuation_time = start_loop_time + car_params::actuation_latency;
   
   // Clear previous visualizations.
   visualization::ClearVisualizationMsg(local_viz_msg_);
-  visualization::ClearVisualizationMsg(global_viz_msg_);
+  //visualization::ClearVisualizationMsg(global_viz_msg_);
 
   // If odometry has not been initialized, we can't do anything.
   if (!odom_initialized_) return;
-
+  //This function gets called 20 times a second to form the control loop.
+  
   //Latency Compensation
   obstacle_avoidance::CleanVelocityBuffer(vel_commands_, std::min(odom_stamp_, point_cloud_stamp_));
 
@@ -335,7 +371,7 @@ void Navigation::Run(){
   //obstacle_avoidance::VisualizeObstacleAvoidanceInfo(goal_point,path_options,best_path,local_viz_msg_);
   
   // 7) Publish commands with 1-D TOC, update vector of previous vehicle commands
-  TimeOptimalControl(best_path);
+  // TimeOptimalControl(best_path);
     
   CommandStamped drive_cmd(drive_msg_.velocity, drive_msg_.curvature, drive_msg_.header.stamp.toNSec() + car_params::actuation_latency);
   vel_commands_.push_back(drive_cmd);
@@ -347,6 +383,8 @@ void Navigation::Run(){
   // Publish messages.
   viz_pub_.publish(local_viz_msg_);
   viz_pub_.publish(global_viz_msg_);
+
+  //sleep(30);
 }
     
 }  // namespace navigation
