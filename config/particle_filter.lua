@@ -11,7 +11,7 @@ range_max = 10.0
 -- Initial cloud distribution --
 init_x_sigma = 0.3 -- 99% of the time, within a meter
 init_y_sigma = 0.3 -- 99% of the time, within a meter
-init_r_sigma = 0.2  -- 99% of the time, its within 35 deg
+init_r_sigma = 0.3  -- 99% of the time, its within 35 deg
 
 -- Motion Model Params --
 k1 = 0.4   -- x error from translation         -- 95% of translations are within 15% margin of error
@@ -26,7 +26,7 @@ min_update_angle = 0.00
 
 -- Limited by computation --
 num_particles = 100 -- Increase until computation runs out
-resize_factor = 10          -- # num_points / resize_factor = num_rays
+resize_factor = 20          -- # num_points / resize_factor = num_rays
 
 sigma_observation = 0.1    -- Prof recommends 0.15-0.2 based on sensor specs
 gamma = 0.05 -- 0.01                -- TODO Experimental tuning

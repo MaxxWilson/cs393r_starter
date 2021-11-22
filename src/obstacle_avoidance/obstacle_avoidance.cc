@@ -22,7 +22,7 @@
 #include <iostream>
 
 #include "shared/math/math_util.h"
-
+#include "config_reader/config_reader.h"
 #include "obstacle_avoidance/obstacle_avoidance.h"
 
 
@@ -33,8 +33,8 @@
 
 
 // line arguments used in obstacle avoidance function
-DEFINE_double(clearance_param, car_params::clearance_gain, "clearance parameter used in scoring function");
-DEFINE_double(distance_goal_param, car_params::dist_goal_gain, "distance to goal parameter used in scoring function");
+//DEFINE_double(clearance_param, CONFIG_clearance_gain, "clearance parameter used in scoring function");
+//DEFINE_double(distance_goal_param, CONFIG_dist_goal_gain, "distance to goal parameter used in scoring function");
 
 using namespace math_util;
 
@@ -47,12 +47,12 @@ bool IsPointCollisionPossible(float curvature, const Eigen::Vector2f &point){
         // Ignore points behind car
         return false;
     }
-    else if(Sign(curvature)*point[1] < -car_params::clearance_factor){ //-(car_params::width/2 + car_params::safety_margin + car_params::clearance_factor)){
+    else if(Sign(curvature)*point[1] < -CONFIG_clearance_factor){ //-(CONFIG_width/2 + CONFIG_safety_margin + CONFIG_clearance_factor)){
         // Ignore points in the direction opposite of curvature
         // (Can't hit any point to the left when turning right)
         return false;
     }
-    else if(point.norm() > car_params::max_path_length){
+    else if(point.norm() > CONFIG_max_path_length){
         // Ignore points outside of max search area
         // This will change latency depending on environment,
         // longer but consistent might be preferable to sometimes long sometimes short
@@ -92,11 +92,11 @@ void EvaluatePathWithPointCloud(navigation::PathOption &path_option, const PathB
 
 
 navigation::PathOption EvaluatePathWithPoint(const PathBoundaries &collision_bounds, Eigen::Vector2f point){
-        navigation::PathOption path_result{0, 1000, car_params::max_path_length};
+        navigation::PathOption path_result{0, 1000, CONFIG_max_path_length};
 
         // Zero Curvature Collision
-        if(abs(collision_bounds.curvature) < 1e-5 && abs(point[1]) <= (car_params::safety_margin + car_params::width / 2)){
-            path_result.free_path_length = point[0] - car_params::dist_to_front_bumper;
+        if(abs(collision_bounds.curvature) < 1e-5 && abs(point[1]) <= (CONFIG_safety_margin + CONFIG_width / 2)){
+            path_result.free_path_length = point[0] - CONFIG_dist_to_front_bumper;
         }
 
         float radius_to_obstacle = (point - Eigen::Vector2f(0, 1/collision_bounds.curvature)).norm();
@@ -115,7 +115,7 @@ navigation::PathOption EvaluatePathWithPoint(const PathBoundaries &collision_bou
         }
         else if(collision_bounds.boundary_radius <= radius_to_obstacle && radius_to_obstacle <= collision_bounds.max_radius){
             // Front Collision
-            path_result.free_path_length = obstacle_avoidance::GetPathLengthToFrontCollision(radius_to_obstacle, angle_to_obstacle, car_params::dist_to_front_bumper);
+            path_result.free_path_length = obstacle_avoidance::GetPathLengthToFrontCollision(radius_to_obstacle, angle_to_obstacle, CONFIG_dist_to_front_bumper);
         }
         else{
             // No Collision, Outer Miss
@@ -125,7 +125,7 @@ navigation::PathOption EvaluatePathWithPoint(const PathBoundaries &collision_bou
 }
 
 void EvaluateClearanceWithPointCloud(navigation::PathOption &path_option, const PathBoundaries &collision_bounds, const std::vector<Eigen::Vector2f> &point_cloud_){
-    path_option.clearance = car_params::clearance_factor;
+    path_option.clearance = CONFIG_clearance_factor;
     
     for(std::size_t point_index = 0; point_index < point_cloud_.size(); point_index++){
         Eigen::Vector2f point = point_cloud_[point_index];
@@ -140,7 +140,7 @@ void EvaluateClearanceWithPointCloud(navigation::PathOption &path_option, const 
         
         if(clearance<path_option.clearance){
             path_option.clearance = clearance;
-            path_option.closest_point = point_cloud_[point_index];
+            //path_option.closest_point = point_cloud_[point_index];
             
         }
     }
@@ -151,7 +151,7 @@ float EvaluateClearanceWithPoint(const PathBoundaries &collision_bounds, const n
         if(path_option.obstruction[0]>=point[0]&&point[0]>=0) {
             return abs(point[1]);
         }
-        return car_params::clearance_factor;
+        return CONFIG_clearance_factor;
     }
     float radius = abs(1/path_option.curvature);
     float radius_to_point = (point - Eigen::Vector2f(0, abs(1/collision_bounds.curvature))).norm();
@@ -159,13 +159,13 @@ float EvaluateClearanceWithPoint(const PathBoundaries &collision_bounds, const n
     if(angle_to_point<0) angle_to_point = -angle_to_point + M_PI;
     float theta = atan2(path_option.obstruction[0], abs(1/collision_bounds.curvature) - path_option.obstruction[1]);
     if(theta<0) theta = -theta + M_PI;
-    if(angle_to_point>theta) return car_params::clearance_factor;
+    if(angle_to_point>theta) return CONFIG_clearance_factor;
     // Evaluate Collision Region
     if(radius_to_point < collision_bounds.min_radius || radius_to_point > collision_bounds.max_radius){
         // No Collision, Inner Miss
         return abs(radius_to_point - radius);
     }
-    return car_params::clearance_factor;
+    return CONFIG_clearance_factor;
 }
 
 
@@ -214,7 +214,7 @@ void LimitFreePath(navigation::PathOption& path,const Eigen::Vector2f& goal){
     // zero curvature
     if(abs(path.curvature)<1e-3) {
         if(goal[0]>=0&&goal[0]<path.free_path_length) path.free_path_length = goal[0];
-        path.closest_point.x() = path.free_path_length + (car_params::wheel_base+car_params::length)/2;
+        path.closest_point.x() = path.free_path_length + (CONFIG_wheel_base + CONFIG_length)/2;
         path.closest_point.y() = 0;
         path.obstruction = path.closest_point;
         return;
@@ -246,12 +246,12 @@ struct navigation::PathOption ChooseBestPath(std::vector<navigation::PathOption>
     navigation::PathOption* bestPath = NULL;
     double best_score = -DBL_MAX;
     for(auto& path:paths){
-        double distance_to_goal = GetDistanceToGoal(path,goal);
-        // if(abs(path.curvature)<1e-3) {
-        //     std::cout<<"curvature: "<<path.curvature<<", free_path_length: "<<path.free_path_length<<", clearance:"<<path.clearance<<", distance_to_goal"<<distance_to_goal<<std::endl;
-        //     std::cout<<"closest point: ("<<path.closest_point[0]<<","<<path.closest_point[1]<<")"<<std::endl;
-        // }
-        double score = path.free_path_length + FLAGS_clearance_param * path.clearance + FLAGS_distance_goal_param * distance_to_goal;
+        path.dist_to_goal = GetDistanceToGoal(path,goal);
+
+        //std::cout<<"curvature: "<<path.curvature<<", free_path_length: "<<path.free_path_length<<", clearance:"<<path.clearance<<", distance_to_goal"<<distance_to_goal<<std::endl;
+
+        double score = path.free_path_length + CONFIG_clearance_gain * path.clearance + CONFIG_dist_goal_gain * path.dist_to_goal;
+        
         if(score>best_score){
             best_score = score;
             bestPath = &path;
@@ -273,10 +273,10 @@ void VisualizeObstacleAvoidanceInfo(Eigen::Vector2f& goal,
 
 // Outline the car[Yellow Line] and safety margin
 void CarOutliner(amrl_msgs::VisualizationMsg &msg){
-    Eigen::Vector2f front_left((car_params::wheel_base+car_params::length)/2,car_params::width/2);
-    Eigen::Vector2f front_right((car_params::wheel_base+car_params::length)/2,-car_params::width/2);
-    Eigen::Vector2f back_left(-(car_params::length-car_params::wheel_base)/2,car_params::width/2);
-    Eigen::Vector2f back_right(-(car_params::length-car_params::wheel_base)/2,-car_params::width/2);
+    Eigen::Vector2f front_left((CONFIG_wheel_base+CONFIG_length)/2,CONFIG_width/2);
+    Eigen::Vector2f front_right((CONFIG_wheel_base+CONFIG_length)/2,-CONFIG_width/2);
+    Eigen::Vector2f back_left(-(CONFIG_length-CONFIG_wheel_base)/2,CONFIG_width/2);
+    Eigen::Vector2f back_right(-(CONFIG_length-CONFIG_wheel_base)/2,-CONFIG_width/2);
     //car front
     visualization::DrawLine(front_left,front_right,0xfcd703,msg);
     //car back
@@ -303,7 +303,7 @@ void SelectedPathOutliner(const navigation::PathOption& selected_path,amrl_msgs:
 }
 // Draw goal [Red Cross]
 void GoalOutliner(Eigen::Vector2f& goal, amrl_msgs::VisualizationMsg& msg){
-    visualization::DrawCross(goal,0.5,0xfc4103,msg);
+    visualization::DrawCross(goal,0.5, 0x0000FF,msg);
 }
 
 void CleanVelocityBuffer(std::vector<navigation::CommandStamped> &v, uint64_t time){
@@ -319,8 +319,8 @@ Eigen::Vector2f Integrate(uint64_t stamp, std::vector<navigation::CommandStamped
     // std::cout << "    stamp: " <<  stamp << "\n";
     // std::cout << "    ros::Time::now(): " <<  ros::Time::now().toNSec() << "\n";
     // std::cout << "    del_t(ns): " << ros::Time::now().toNSec() -  stamp << "\n";
-    float del_x = (v[it].velocity * cos(angle)) * pow(10.0, -9.0) * (car_params::sys_latency);//sys_latency in ns
-    float del_y = (v[it].velocity) * sin(angle) * pow(10.0, -9.0) * (car_params::sys_latency);
+    float del_x = (v[it].velocity * cos(angle)) * pow(10.0, -9.0) * (CONFIG_sys_latency);//sys_latency in ns
+    float del_y = (v[it].velocity) * sin(angle) * pow(10.0, -9.0) * (CONFIG_sys_latency);
     return Eigen::Vector2f(del_x, del_y);
 }
 
@@ -328,9 +328,9 @@ Eigen::Vector2f Integrate(uint64_t stamp, std::vector<navigation::CommandStamped
 // Outline forward-predicted position of car [blue]
 void DrawCarLocal(amrl_msgs::VisualizationMsg &msg, Eigen::Vector2f position, float theta){
 
-    float fwd = car_params::dist_to_front_bumper;
-    float side = car_params::dist_to_side_bumper;
-    float rear = car_params::dist_to_rear_bumper;
+    float fwd = CONFIG_dist_to_front_bumper;
+    float side = CONFIG_dist_to_side_bumper;
+    float rear = CONFIG_dist_to_rear_bumper;
     uint32_t color = 0x1e9aa8;
 
     Eigen::Vector2f front_left = position + Eigen::Vector2f(-side*sin(theta) + fwd*cos(theta), side*cos(theta) + fwd*sin(theta));
@@ -366,7 +366,7 @@ navigation::TimeShiftedTF IntegrateState(navigation::TimeShiftedTF curr_state, n
 }
 
 double getNewSpeed(double current_velocity, double command_velocity, double timestep){
-    float accel = (command_velocity >= current_velocity) ? car_params::max_acceleration : car_params::min_acceleration;
+    float accel = (command_velocity >= current_velocity) ? CONFIG_max_acceleration : CONFIG_min_acceleration;
     if(Sign(accel) == 1){ // accelerating
         return std::min(current_velocity + accel*timestep, command_velocity);
     }

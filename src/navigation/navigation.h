@@ -22,6 +22,7 @@
 #include <vector>
 
 #include "cost_map/cost_map.h"
+#include "visualization/visualization.h"
 
 #include "eigen3/Eigen/Dense"
 #include "ros/ros.h"
@@ -39,6 +40,7 @@ struct PathOption {
   float curvature;
   float clearance;
   float free_path_length;
+  float dist_to_goal;
   Eigen::Vector2f obstruction;
   Eigen::Vector2f closest_point;
   EIGEN_MAKE_ALIGNED_OPERATOR_NEW;
@@ -90,6 +92,8 @@ class Navigation {
   void ObservePointCloud(const std::vector<Eigen::Vector2f>& cloud,
                          uint64_t time);
 
+  void Replan();
+
   // Main function called continously from main
   void Run();
   // Used to set the next target pose.
@@ -97,6 +101,11 @@ class Navigation {
 
   // Use time optimal strategy to control the car
   void TimeOptimalControl(const PathOption& path);
+
+  // Implements pure pursuit algorithm
+  bool PurePursuit(Eigen::Vector2f &goal_point);
+  bool pointIsInCircle(Eigen::Vector2f point, Eigen::Vector2f circle_center, double radius);
+  bool IsIntersectingCircle(Eigen::Vector2f point_1, Eigen::Vector2f point_2, Eigen::Vector2f& intersection_point);
 
   std::vector<CommandStamped> vel_commands_;
 
@@ -145,14 +154,17 @@ class Navigation {
   costmap::CostMap collision_map_;
 
   // Whether navigation is complete.
-  bool nav_complete_;
+  bool nav_complete_ = true;
   // Navigation goal location.
   Eigen::Vector2f nav_goal_loc_;
   // Navigation goal angle.
   float nav_goal_angle_;
 
+  std::vector<Eigen::Vector2f> global_plan_;
+
   bool first_cycle = true;
 
+  void GetCollisionMap();
   void TransformPointCloud(TimeShiftedTF transform);
 };
 
