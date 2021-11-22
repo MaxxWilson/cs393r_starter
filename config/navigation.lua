@@ -21,30 +21,31 @@ dist_to_front_bumper = (length + wheel_base)/2 + safety_margin
 dist_to_side_bumper = width/2 + safety_margin
 dist_to_rear_bumper = (length-wheel_base)/2
 
-min_curvature = -1.0
-max_curvature = 1.0 -- +-0.75
+min_curvature = -1.2
+max_curvature = 1.2 -- +-0.75
 
  -- Dynamics --
 max_acceleration = 6.0;
 min_acceleration = -6.0;
-max_velocity = 1.25;
+max_velocity = 1.5;
 
 -- Algorithmic Parameters --
-safe_distance = 0.10 -- safe distance used in TOC control, stops with 5" left to obstacle
+safe_distance = 0.1 -- safe distance used in TOC control, stops with 5" left to obstacle
 max_path_length = 8.0
 curvature_increment = 0.02
 num_curves = (max_curvature - min_curvature)/curvature_increment
-clearance_factor = width/2 + safety_margin + 0.1 -- ~6"
+clearance_factor = width/2 + safety_margin + 0.28 -- ~6"
 
-sys_latency = 1e9 * 0.215; -- ns
+sys_latency = 1e9 * 0.220; -- ns
 sensing_latency =  1*sys_latency/4;
 actuation_latency = 3*sys_latency/4;
 
 ----- Tunables -----
 -- Obstace Avoidance --
-clearance_gain = 5.0
-dist_goal_gain = -5.0
+clearance_gain = 7.0
+dist_goal_gain = -0.7
 
 -- Pure Pursuit --
 pursuit_radius = 2.5 -- meters
 goal_threshold = 0.5 -- meters
+path_replan_deviation = 0.5

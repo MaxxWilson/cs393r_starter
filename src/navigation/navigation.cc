@@ -85,6 +85,7 @@ CONFIG_FLOAT(max_path_length, "max_path_length");
 
 CONFIG_FLOAT(clearance_gain, "clearance_gain");
 CONFIG_FLOAT(dist_goal_gain, "dist_goal_gain");
+CONFIG_FLOAT(path_replan_deviation, "path_replan_deviation");
 
 Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
     odom_initialized_(false),
@@ -120,7 +121,7 @@ Navigation::Navigation(const string& map_file, ros::NodeHandle* n) :
       image.draw_point(x, CONFIG_row_num - y - 1, &color, collision_map_.GetValueAtIdx(x, y));
     }
   }
-
+  visualization::ClearVisualizationMsg(global_viz_msg_);
   // collision_map_.DisplayImage(image);
 }
 
@@ -220,9 +221,12 @@ bool Navigation::PurePursuit(Eigen::Vector2f &goal_point){
   goal_point = Eigen::Vector2f(0, 0);
   Eigen::Vector2f intersection(0, 0);
   int curr_wpt_index_ = 0;
-
+  float min_dist_to_path = 10.0;
   // Search global plan for intersections, and select intersection in front of robot as goal point
   while(curr_wpt_index_ < global_plan_.size()){
+    if((global_plan_[curr_wpt_index_]-robot_loc_).norm() < min_dist_to_path){
+      min_dist_to_path = (global_plan_[curr_wpt_index_]-robot_loc_).norm();
+    }
     if(IsIntersectingCircle(global_plan_[curr_wpt_index_], global_plan_[curr_wpt_index_+1], intersection)){
       intersection = Eigen::Rotation2D<float>(-robot_angle_)*(intersection - robot_loc_);
       if(intersection.x() > goal_point.x() || goal_point.norm() == 0){
@@ -238,11 +242,11 @@ bool Navigation::PurePursuit(Eigen::Vector2f &goal_point){
   }
 
   // If goal point is set, return true
-  if(goal_point.norm() != 0){
-    return true;
+  if(goal_point.norm() == 0 || min_dist_to_path > CONFIG_path_replan_deviation){
+    return false;
   }
-
-  return false;
+  std::cout << "Min Dist to Replan: " << min_dist_to_path << std::endl;
+  return true;
 }
 
 bool Navigation::pointIsInCircle(Eigen::Vector2f point, Eigen::Vector2f circle_center, double radius){
@@ -355,6 +359,7 @@ bool Navigation::IsIntersectingCircle(Eigen::Vector2f point_1, Eigen::Vector2f p
 void Navigation::Run(){
   
   uint64_t start_loop_time = ros::Time::now().toNSec();
+  double st = GetMonotonicTime();
   uint64_t actuation_time = start_loop_time + CONFIG_actuation_latency;
   
   // Clear previous visualizations.
@@ -461,7 +466,7 @@ void Navigation::Run(){
     obstacle_avoidance::PathBoundaries collision_bounds(abs(curvature));
     path_options[curve_index] = navigation::PathOption{
       curvature,                    // curvature
-      10,                           // default clearance
+      3,                           // default clearance
       CONFIG_max_path_length,       // free Path Length
       0.0,                          // dist to goal
       Eigen::Vector2f(0, 0),        // obstacle point
@@ -484,7 +489,7 @@ void Navigation::Run(){
   std::cout << "Dist To Goal Score: " << CONFIG_dist_goal_gain * best_path.dist_to_goal << std::endl << std::endl;
 
   obstacle_avoidance::VisualizeObstacleAvoidanceInfo(goal_point,path_options,best_path,local_viz_msg_);
-  
+  std::cout << "Nav Loop Time: " << (GetMonotonicTime() - st)*1000 << std::endl; 
   // 7) Publish commands with 1-D TOC, update vector of previous vehicle commands
   TimeOptimalControl(best_path);
     

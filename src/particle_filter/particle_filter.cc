@@ -296,17 +296,17 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
     std::fill(weight_bins_.begin(), weight_bins_.end(), 0);
 
     // Update each particle with log error weight and find largest weight (smallest negative number)
-    double particle_update_start = GetMonotonicTime();
-    double p_update_start = 0;
-    double p_update_diff_avg = 0;
+    //double particle_update_start = GetMonotonicTime();
+    //double p_update_start = 0;
+    //double p_update_diff_avg = 0;
     for(Particle &p: particles_){
-      p_update_start = GetMonotonicTime();
+      //p_update_start = GetMonotonicTime();
       Update(ranges, range_min, range_max, angle_min, angle_max, &p);
       max_weight_log_ = std::max(max_weight_log_, p.weight);
-      p_update_diff_avg += 1000000*(GetMonotonicTime() - p_update_start);
+      //p_update_diff_avg += 1000000*(GetMonotonicTime() - p_update_start);
     }
-    double particle_update_diff = 1000*(GetMonotonicTime() - particle_update_start);
-    p_update_diff_avg /= particles_.size();
+    //double particle_update_diff = 1000*(GetMonotonicTime() - particle_update_start);
+    //p_update_diff_avg /= particles_.size();
     // std::cout << "Particle Update (ms): " << particle_update_diff << " Avg (us): " << p_update_diff_avg << std::endl;
 
     // Normalize log-likelihood weights by max log weight and transform back to linear scale
@@ -324,12 +324,14 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
     last_update_angle_ = prev_odom_angle_;
     resample_loop_counter_++;
 
-    end_time += 1000*(GetMonotonicTime() - start_time);
-    if(i%10 == 0){
-      std::cout << "Total Update Avg (ms): " << end_time/10.0 << std::endl << std::endl;;
-      end_time = 0;
-    }
-    i++;
+    //end_time += 1000*(GetMonotonicTime() - start_time);
+    double end_time = GetMonotonicTime();
+    std::cout << 1000*(end_time - start_time) << std::endl;
+    // if(i%10 == 0){
+    //   std::cout << "Total Update Avg (ms): " << end_time/10.0 << std::endl << std::endl;;
+    //   end_time = 0;
+    // }
+    // i++;
   }                     
 }
 

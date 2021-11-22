@@ -140,7 +140,7 @@ void EvaluateClearanceWithPointCloud(navigation::PathOption &path_option, const 
         
         if(clearance<path_option.clearance){
             path_option.clearance = clearance;
-            path_option.closest_point = point_cloud_[point_index];
+            //path_option.closest_point = point_cloud_[point_index];
             
         }
     }
