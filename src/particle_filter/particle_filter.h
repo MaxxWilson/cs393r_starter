@@ -28,6 +28,7 @@
 #include "shared/util/random.h"
 #include "vector_map/vector_map.h"
 #include "visualization/visualization.h"
+#include "cost_map/cost_map.h"
 
 #ifndef SRC_PARTICLE_FILTER_H_
 #define SRC_PARTICLE_FILTER_H_
@@ -50,7 +51,8 @@ class ParticleFilter {
                     float range_min,
                     float range_max,
                     float angle_min,
-                    float angle_max);
+                    float angle_max,
+                    float angle_increment);
 
   // Predict particle motion based on odometry.
   void Predict(const Eigen::Vector2f& odom_loc,
@@ -96,8 +98,9 @@ class ParticleFilter {
 
   void SetParticlesForTesting(std::vector<Particle> new_particles);
 
- Eigen::Vector2f BaseLinkToSensorFrame(const Eigen::Vector2f &loc, const float &angle);
+  Eigen::Vector2f BaseLinkToSensorFrame(const Eigen::Vector2f &loc, const float &angle);
 
+  costmap::CostMap GetCSMMap();
  private:
 
   // List of particles being tracked.
@@ -121,6 +124,10 @@ class ParticleFilter {
   // float first_odom_angle;
   // bool first_odom_flag = true;
   
+  costmap::CostMap csm_map_;
+  bool csm_map_initialized = false;
+  std::vector<Eigen::Vector2f> cloud_;
+
   std::vector<double> weight_bins_;
   double max_weight_log_ = 0;
   double weight_sum_ = 0;

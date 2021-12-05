@@ -26,6 +26,10 @@
 #include "vector_map/vector_map.h"
 #include "visualization/CImg.h"
 
+#include "ros/ros.h"
+#include "cv_bridge/cv_bridge.h"
+#include "image_transport/image_transport.h"
+
 #include <vector>
 #include <utility>
 using std::vector;
@@ -48,26 +52,38 @@ class CostMap{
         void UpdateCostMap(const std::vector<Eigen::Vector2f> &cloud);
         
         void DrawCostMap(CImg<float> &image);
+
         void DisplayImage(CImg<float> &image);
         
         void UpdateCollisionMap(const std::vector<geometry::line2f> lines);
 
         void SetLikelihoodAtPosition(double x, double y, double likelihood);
+
         double GetLikelihoodAtPosition(double x, double y, bool normalized = true) const;
+
         int GetIndexFromDist(double dist) const;
+
         std::pair<int, int> GetIndexPairFromDist(Eigen::Vector2f loc) const;
+
         Eigen::Vector2f GetLocFromIndex(int xIdx, int yIdx) const;
+
         float RoundToResolution(float value, float res) const;
+
         void ClearMap();
+
         inline int GetRowNum() const {
             return cost_map_vector.size();
         };
+
         inline int GetColNum() const {
             return cost_map_vector[0].size();
         };
+
         inline double GetValueAtIdx(int xIdx, int yIdx) const{
             return cost_map_vector[xIdx][yIdx];
         }
+
+        cv::Mat GetCSMImage();
     private:
         vector<vector<double>> cost_map_vector;
 

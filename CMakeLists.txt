@@ -28,8 +28,11 @@ MESSAGE(STATUS "CXX Flags: ${CMAKE_CXX_FLAGS}")
 SET(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 SET(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
+find_package( OpenCV REQUIRED )
+include_directories( ${OpenCV_INCLUDE_DIRS} )
+
 SET(libs roslib roscpp rosbag glog gflags amrl-shared-lib boost_system lua5.1
-    pthread gtest)
+    pthread gtest cv_bridge ${OpenCV_LIBS} X11)
 
 ADD_LIBRARY(shared_library
             src/visualization/visualization.cc
@@ -46,24 +49,20 @@ ROSBUILD_ADD_EXECUTABLE(slam
                         src/cost_map/cost_map.cc
                         src/slam/slam_main.cc
                         src/slam/slam.cc)
-TARGET_LINK_LIBRARIES(slam shared_library ${libs} X11)
+TARGET_LINK_LIBRARIES(slam shared_library ${libs})
 
 
 ROSBUILD_ADD_EXECUTABLE(particle_filter
+                        src/cost_map/cost_map.cc
                         src/particle_filter/particle_filter_main.cc
                         src/particle_filter/particle_filter.cc)
 TARGET_LINK_LIBRARIES(particle_filter shared_library ${libs})
-
-ADD_EXECUTABLE(test_particle_filter
-                        src/particle_filter/particle_filter_test.cc
-                        src/particle_filter/particle_filter.cc)
-TARGET_LINK_LIBRARIES(test_particle_filter shared_library ${libs})
 
 ROSBUILD_ADD_EXECUTABLE(navigation
                         src/cost_map/cost_map.cc
                         src/navigation/navigation_main.cc
                         src/navigation/navigation.cc)
-TARGET_LINK_LIBRARIES(navigation shared_library obstacle_avoidance ${libs} X11)
+TARGET_LINK_LIBRARIES(navigation shared_library obstacle_avoidance ${libs})
 
 ADD_EXECUTABLE(eigen_tutorial
                src/eigen_tutorial.cc)

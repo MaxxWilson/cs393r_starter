@@ -19,12 +19,12 @@
 */
 //========================================================================
 
-#include "config_reader/config_reader.h"
 #include "shared/math/math_util.h"
-#include "cost_map.h"
 #include "shared/math/statistics.h"
 #include "eigen3/Eigen/Dense"
 #include "eigen3/Eigen/Geometry"
+#include "config_reader/config_reader.h"
+#include "cost_map.h"
 
 #include "visualization/CImg.h"
 using cimg_library::CImg;
@@ -122,6 +122,20 @@ void CostMap::DrawCostMap(CImg<float> &image){
     }
 }
 
+cv::Mat CostMap::GetCSMImage(){
+    cv::Mat image(CONFIG_row_num, CONFIG_row_num, CV_8UC3, cv::Scalar(255, 255, 255));
+    for(int x = 0; x < CONFIG_row_num; x++){
+        for(int y = 0; y < CONFIG_row_num; y++){
+            // Image coordinate frame is LHR, BGR
+            int image_y = CONFIG_row_num - y - 1;
+            image.at<cv::Vec3b>(image_y, x)[0] = 255 - (int) (255*cost_map_vector[x][y] / max_likelihood);
+            image.at<cv::Vec3b>(image_y, x)[1] = 255 - (int) (255*cost_map_vector[x][y] / max_likelihood);
+            image.at<cv::Vec3b>(image_y, x)[2] = 255;
+        }
+    }
+    return image;
+}
+
 void CostMap::DisplayImage(CImg<float> &image){
     CImgDisplay main_disp(image,"Click a point");
     while (!main_disp.is_closed()) {
@@ -140,6 +154,7 @@ void CostMap::ClearMap(){
     for(std::size_t i = 0; i < cost_map_vector.size(); i++){
         std::fill(cost_map_vector[i].begin(), cost_map_vector[i].end(), 0.0);
     }
+    max_likelihood = 0.0;
 }
 
 void CostMap::SetLikelihoodAtPosition(double x, double y, double likelihood){

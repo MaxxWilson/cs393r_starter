@@ -36,6 +36,7 @@
 #include "gflags/gflags.h"
 #include "geometry_msgs/PoseArray.h"
 #include "sensor_msgs/LaserScan.h"
+#include "sensor_msgs/Image.h"
 #include "nav_msgs/Odometry.h"
 #include "ros/ros.h"
 #include "rosbag/bag.h"
@@ -86,6 +87,7 @@ particle_filter::ParticleFilter particle_filter_;
 ros::Publisher visualization_publisher_;
 ros::Publisher localization_publisher_;
 ros::Publisher laser_publisher_;
+ros::Publisher scan_image_publisher_;
 VisualizationMsg vis_msg_;
 sensor_msgs::LaserScan last_laser_msg_;
 
@@ -150,6 +152,13 @@ void PublishTrajectory() {
   }
 }
 
+void PublishScanImage(){
+  // rosrun rqt_image_view rqt_image_view image:="/scan_image"
+  cv::Mat image = particle_filter_.GetCSMMap().GetCSMImage();
+  sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", image).toImageMsg();
+  scan_image_publisher_.publish(msg);
+}
+
 void PublishVisualization() {
   static double t_last = 0;
   if (GetMonotonicTime() - t_last < 0.05) {
@@ -163,6 +172,7 @@ void PublishVisualization() {
   PublishParticles();
   PublishPredictedScan();
   PublishTrajectory();
+  PublishScanImage();
   visualization_publisher_.publish(vis_msg_);
 }
 
@@ -176,7 +186,8 @@ void LaserCallback(const sensor_msgs::LaserScan& msg) {
       msg.range_min,
       msg.range_max,
       msg.angle_min,
-      msg.angle_max);
+      msg.angle_max,
+      msg.angle_increment);
 
   Vector2f robot_loc(0, 0);
   float robot_angle(0);
@@ -265,6 +276,8 @@ int main(int argc, char** argv) {
       n.advertise<amrl_msgs::Localization2DMsg>("localization", 1);
   laser_publisher_ =
       n.advertise<sensor_msgs::LaserScan>("scan", 1);
+  scan_image_publisher_ =
+      n.advertise<sensor_msgs::Image>("scan_image", 1);
 
   ProcessLive(&n);
 

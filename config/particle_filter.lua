@@ -21,8 +21,8 @@ k4 = 0.3   -- y error from rotation            -- at 45 deg, 99% of values withi
 k5 = 0.5   -- rotation error from translation  -- at 1m, 99% of values within 7 deg
 k6 = 1.5    -- rotation error from rotation     -- 95% of translations are within 15% margin of error
 
-min_update_dist = 0.00                       -- Based on odometry messages at 1m/s at 40Hz
-min_update_angle = 0.00
+min_update_dist = 20.00                       -- Based on odometry messages at 1m/s at 40Hz
+min_update_angle = 20.00
 
 -- Limited by computation --
 num_particles = 100 -- Increase until computation runs out
@@ -37,3 +37,19 @@ dist_short = 0.23   -- 1 std from sensor 68.2%
 dist_long = 0.28     -- 2 std from sensor 95%
 
 resample_frequency = 8     -- TODO Experimental tuning
+
+-- Cost Map --
+dist_update_thresh = 0.3
+angle_update_thresh = 0.2 -- 15°
+
+-- CSM Search --
+dist_res = 0.04 -- 0.02 -- 50 cm
+theta_res = 0.02 -- 0.03 -- ~5°
+
+theta_search_const = 13
+dist_search_const = 5
+
+map_length_dist = dist_update_thresh + range_max + laser_offset + 4*sigma_observation + 5.0
+row_num = 2*(map_length_dist)/dist_res + 1
+
+dilation_factor = 2

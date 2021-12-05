@@ -46,6 +46,8 @@ using Eigen::Vector2f;
 using Eigen::Vector2i;
 using vector_map::VectorMap;
 
+namespace particle_filter {
+
 CONFIG_INT(num_particles, "num_particles");
 CONFIG_FLOAT(init_x_sigma, "init_x_sigma");
 CONFIG_FLOAT(init_y_sigma, "init_y_sigma");
@@ -73,7 +75,7 @@ CONFIG_DOUBLE(range_max, "range_max");
 CONFIG_DOUBLE(resize_factor, "resize_factor");
 CONFIG_INT(resample_frequency, "resample_frequency");
 
-namespace particle_filter {
+CONFIG_INT(row_num, "row_num");
   Vector2f first_odom_loc;
   float first_odom_angle;
 
@@ -282,7 +284,27 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
                                   float range_min,
                                   float range_max,
                                   float angle_min,
-                                  float angle_max) {
+                                  float angle_max,
+                                  float angle_increment) {
+
+  if(!csm_map_initialized){
+    csm_map_ = costmap::CostMap();
+
+    cloud_ = vector<Vector2f>(ranges.size());
+  }
+
+  for(std::size_t i = 0; i < ranges.size(); i++){
+    // Polar to Cartesian conversion, transforms to base link frame of new pose
+    float angle = angle_min + angle_increment*i;
+    float x = ranges[i]*cos(angle) + CONFIG_laser_offset;
+    float y = ranges[i]*sin(angle);
+    cloud_[i] = Vector2f(x, y);
+  }
+
+  csm_map_.UpdateCostMap(cloud_);
+  //BuildMapFromScan(cloud_, poses.back());
+  csm_map_initialized = true;
+
   // A new laser scan observation is available (in the laser frame)
   // Call the Update and Resample steps as necessary.
   double delta_translation = (last_update_loc_ - prev_odom_loc_).norm();
@@ -294,6 +316,8 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
     weight_sum_ = 0;
     weight_bins_.resize(particles_.size());
     std::fill(weight_bins_.begin(), weight_bins_.end(), 0);
+
+    // Estimate Lidar Odometry for new laser scan
 
     // Update each particle with log error weight and find largest weight (smallest negative number)
     double particle_update_start = GetMonotonicTime();
@@ -449,6 +473,10 @@ void ParticleFilter::GetLocation(Eigen::Vector2f* loc_ptr,
 
 Eigen::Vector2f ParticleFilter::BaseLinkToSensorFrame(const Eigen::Vector2f &loc, const float &angle){
   return loc + Vector2f(CONFIG_laser_offset*cos(angle), CONFIG_laser_offset*sin(angle));
+}
+
+costmap::CostMap ParticleFilter::GetCSMMap(){
+  return csm_map_;
 }
 
 }  // namespace particle_filter
