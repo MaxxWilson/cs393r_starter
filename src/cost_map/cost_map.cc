@@ -39,10 +39,12 @@ CONFIG_DOUBLE(sigma_observation, "sigma_observation");
 CONFIG_DOUBLE(range_max, "range_max");
 CONFIG_INT(row_num, "row_num");
 CONFIG_INT(dilation_factor, "dilation_factor");
+CONFIG_INT(min_map_prob, "min_map_prob");
 
 
-CostMap::CostMap(): cost_map_vector(CONFIG_row_num, vector<double>(CONFIG_row_num, 0.0)){
-    max_likelihood = 0.0;
+CostMap::CostMap(): cost_map_vector(CONFIG_row_num, vector<double>(CONFIG_row_num, CONFIG_min_map_prob)){
+    max_log_likelihood = CONFIG_min_map_prob;
+    image = cv::Mat(CONFIG_row_num, CONFIG_row_num, CV_8UC3, cv::Scalar(255, 255, 255));
 }
 
 void CostMap::UpdateCollisionMap(const std::vector<geometry::line2f> lines){
@@ -91,17 +93,18 @@ void CostMap::UpdateCostMap(const std::vector<Eigen::Vector2f> &cloud){
                 double dist_from_scan_point = (scan_point_bin - curr_position).norm();
 
                 //Calculate normal gaussian distribution to be put into cost map
-                double gauss_dist = statistics::ProbabilityDensityGaussian(0.0, dist_from_scan_point, CONFIG_sigma_observation);
-                try {
-                    // double current_likelihood = cost_map_vector[GetIndexFromDist(curr_position.x())][GetIndexFromDist(curr_position.y())];
-                    double current_likelihood = GetLikelihoodAtPosition(curr_position.x(), curr_position.y(), false);
-                    // Find largest guassian likelihood for normalization
-                    if(gauss_dist + current_likelihood > max_likelihood){
-                        max_likelihood = gauss_dist + current_likelihood;
+                double new_log_likelihood = -(dist_from_scan_point*dist_from_scan_point)/(CONFIG_sigma_observation*CONFIG_sigma_observation);
+                double current_log_likelihood = GetLogLikelihoodAtPosition(curr_position.x(), curr_position.y());
+                
+                max_log_likelihood = std::max(max_log_likelihood, new_log_likelihood);
+
+                if(new_log_likelihood > current_log_likelihood){
+                    try{
+                        SetLikelihoodAtPosition(curr_position.x(), curr_position.y(), new_log_likelihood);
+                    } catch(std::out_of_range) {
+                        std::cout << "Out of Range" << std::endl;
+                        continue;
                     }
-                    SetLikelihoodAtPosition(curr_position.x(), curr_position.y(), gauss_dist + current_likelihood);
-                } catch(std::out_of_range) {
-                    continue;
                 }
             }   
         }
@@ -117,22 +120,60 @@ void CostMap::DrawCostMap(CImg<float> &image){
     for(int x = 0; x < CONFIG_row_num; x++){
         for(int y = 0; y < CONFIG_row_num; y++){
             // Image coordinate frame is LHR
-            image.draw_point(x, CONFIG_row_num - y - 1, red, cost_map_vector[x][y] / max_likelihood);
+            image.draw_point(x, CONFIG_row_num - y - 1, red, cost_map_vector[x][y]);
+        }
+    }
+}
+
+void CostMap::UpdateCSMImage(){
+    image = cv::Mat(CONFIG_row_num, CONFIG_row_num, CV_8UC3, cv::Scalar(255, 255, 255));
+    for(int x = 0; x < CONFIG_row_num; x++){
+        for(int y = 0; y < CONFIG_row_num; y++){
+            // Image coordinate frame is LHR, BGR
+            int image_y = CONFIG_row_num - y - 1;
+            image.at<cv::Vec3b>(image_y, x)[0] = 255 - (int) (255*(ConvertLogToStandard(cost_map_vector[x][y])/ConvertLogToStandard(max_log_likelihood)));
+            image.at<cv::Vec3b>(image_y, x)[1] = 255 - (int) (255*(ConvertLogToStandard(cost_map_vector[x][y])/ConvertLogToStandard(max_log_likelihood)));
+            image.at<cv::Vec3b>(image_y, x)[2] = 255;
+        }
+    }
+
+    double origin = GetIndexFromDist(0.0);
+
+    for(int x = origin - 1; x <= origin + 1; x++){
+        for(int y = origin - 1; y <= origin + 1; y++){
+            image.at<cv::Vec3b>(y, x)[0] = 0;
+            image.at<cv::Vec3b>(y, x)[1] = 0;
+            image.at<cv::Vec3b>(y, x)[2] = 0;
+        }
+    }
+}
+
+void CostMap::AddPointsToCSMImage(const std::vector<Eigen::Vector2f> &cloud){
+    for(Eigen::Vector2f point: cloud){
+        try{
+            if(point.norm() >= CONFIG_range_max) {
+                continue;
+            }
+            double xIdx = GetIndexFromDist(point.x());
+            double yIdx = GetIndexFromDist(point.y());
+            if(xIdx < 0 || xIdx >= cost_map_vector.size() || yIdx < 0 || yIdx >= cost_map_vector[0].size()) throw std::out_of_range("Out of boundaries");
+            int image_y = CONFIG_row_num - yIdx - 1;
+
+            for(int x = xIdx - 1; x <= xIdx + 1; x++){
+                for(int y = image_y - 1; y <= image_y + 1; y++){
+                    image.at<cv::Vec3b>(y, x)[0] = 0;
+                    image.at<cv::Vec3b>(y, x)[1] = 0;
+                    image.at<cv::Vec3b>(y, x)[2] = 0;
+                }
+            }
+        }
+        catch(std::out_of_range) {
+            continue;
         }
     }
 }
 
 cv::Mat CostMap::GetCSMImage(){
-    cv::Mat image(CONFIG_row_num, CONFIG_row_num, CV_8UC3, cv::Scalar(255, 255, 255));
-    for(int x = 0; x < CONFIG_row_num; x++){
-        for(int y = 0; y < CONFIG_row_num; y++){
-            // Image coordinate frame is LHR, BGR
-            int image_y = CONFIG_row_num - y - 1;
-            image.at<cv::Vec3b>(image_y, x)[0] = 255 - (int) (255*cost_map_vector[x][y] / max_likelihood);
-            image.at<cv::Vec3b>(image_y, x)[1] = 255 - (int) (255*cost_map_vector[x][y] / max_likelihood);
-            image.at<cv::Vec3b>(image_y, x)[2] = 255;
-        }
-    }
     return image;
 }
 
@@ -152,9 +193,9 @@ void CostMap::DisplayImage(CImg<float> &image){
 
 void CostMap::ClearMap(){
     for(std::size_t i = 0; i < cost_map_vector.size(); i++){
-        std::fill(cost_map_vector[i].begin(), cost_map_vector[i].end(), 0.0);
+        std::fill(cost_map_vector[i].begin(), cost_map_vector[i].end(), CONFIG_min_map_prob);
     }
-    max_likelihood = 0.0;
+    max_log_likelihood = CONFIG_min_map_prob;
 }
 
 void CostMap::SetLikelihoodAtPosition(double x, double y, double likelihood){
@@ -164,16 +205,23 @@ void CostMap::SetLikelihoodAtPosition(double x, double y, double likelihood){
     cost_map_vector[xIdx][yIdx] = likelihood;
 }
 
-double CostMap::GetLikelihoodAtPosition(double x, double y, bool normalized) const{
+double CostMap::GetLogLikelihoodAtPosition(double x, double y) const{
     int xIdx = GetIndexFromDist(x);
     int yIdx = GetIndexFromDist(y);
     if(xIdx < 0 || xIdx >= cost_map_vector.size() || yIdx < 0 || yIdx >= cost_map_vector[0].size()) throw std::out_of_range("Out of boundaries");
-    if(normalized){
-        return (cost_map_vector[xIdx][yIdx] / max_likelihood > 1e-6) ? cost_map_vector[xIdx][yIdx] / max_likelihood : 1e-6;
-    }
-    else{
-        return cost_map_vector[xIdx][yIdx];
-    }
+    return cost_map_vector[xIdx][yIdx];
+}
+
+double CostMap::GetNormalizedLikelihoodAtPosition(double x, double y) const{
+    return GetStandardLikelihoodAtPosition(x, y)/ConvertLogToStandard(max_log_likelihood);
+}
+
+double CostMap::GetStandardLikelihoodAtPosition(double x, double y) const{
+    return ConvertLogToStandard(GetLogLikelihoodAtPosition(x, y));
+}
+
+double CostMap::ConvertLogToStandard(double log_likelihood) const{
+     return 1/(CONFIG_sigma_observation*sqrt(2*M_PI))*exp(log_likelihood);
 }
 
 int CostMap::GetIndexFromDist(double dist) const{

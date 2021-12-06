@@ -25,6 +25,7 @@
 #include "eigen3/Eigen/Dense"
 #include "eigen3/Eigen/Geometry"
 #include "shared/math/line2d.h"
+#include "shared/math/poses_2d.h"
 #include "shared/util/random.h"
 #include "vector_map/vector_map.h"
 #include "visualization/visualization.h"
@@ -32,6 +33,8 @@
 
 #ifndef SRC_PARTICLE_FILTER_H_
 #define SRC_PARTICLE_FILTER_H_
+
+using pose_2d::Pose2D;
 
 namespace particle_filter {
 
@@ -86,6 +89,10 @@ class ParticleFilter {
   static bool horizontal_line_compare(const geometry::line2f l1, const geometry::line2f l2);
   static bool vertical_line_compare(const geometry::line2f l1, const geometry::line2f l2);
 
+  void ConvertScanToPointCloud(const float angle_min, const float angle_increment, const std::vector<float>& ranges, std::vector<Eigen::Vector2f> &cloud);
+
+  Pose2D<float> EstimateLidarOdometry(Pose2D<float> wheel_odometry);
+
   // For debugging: get predicted point cloud from current location.
   void GetPredictedPointCloud(const Eigen::Vector2f& loc,
                               const float angle,
@@ -126,7 +133,7 @@ class ParticleFilter {
   
   costmap::CostMap csm_map_;
   bool csm_map_initialized = false;
-  std::vector<Eigen::Vector2f> cloud_;
+  std::vector<Eigen::Vector2f> scan_cloud_;
 
   std::vector<double> weight_bins_;
   double max_weight_log_ = 0;

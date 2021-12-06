@@ -263,7 +263,7 @@ void Navigation::Run(){
   //obstacle_avoidance::VisualizeObstacleAvoidanceInfo(goal_point,path_options,best_path,local_viz_msg_);
   
   // 7) Publish commands with 1-D TOC, update vector of previous vehicle commands
-  TimeOptimalControl(best_path);
+  // TimeOptimalControl(best_path);
 
     // static double start_timer;
     // if(first_cycle){
@@ -280,8 +280,8 @@ void Navigation::Run(){
     //   drive_msg_.velocity = 1.0;
     // }
     // else{
-    //   drive_msg_.curvature = 0.0;
-    //   drive_msg_.velocity = 0.0;
+      drive_msg_.curvature = 0.0;
+      drive_msg_.velocity = 1.0;
     // }
 
     drive_pub_.publish(drive_msg_);

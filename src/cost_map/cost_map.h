@@ -45,9 +45,6 @@ class CostMap{
     public:
         CostMap();
 
-        //Used to compute normalized log likelihood lookup values from rasterized cost table
-        double max_likelihood;
-
         //Updates rasterized cost table given a new laser scan  
         void UpdateCostMap(const std::vector<Eigen::Vector2f> &cloud);
         
@@ -59,7 +56,13 @@ class CostMap{
 
         void SetLikelihoodAtPosition(double x, double y, double likelihood);
 
-        double GetLikelihoodAtPosition(double x, double y, bool normalized = true) const;
+        double GetLogLikelihoodAtPosition(double x, double y) const;
+
+        double GetNormalizedLikelihoodAtPosition(double x, double y) const;
+
+        double GetStandardLikelihoodAtPosition(double x, double y) const;
+
+        double ConvertLogToStandard(double log_likelihood) const;
 
         int GetIndexFromDist(double dist) const;
 
@@ -83,9 +86,13 @@ class CostMap{
             return cost_map_vector[xIdx][yIdx];
         }
 
+        void UpdateCSMImage();
+        void AddPointsToCSMImage(const std::vector<Eigen::Vector2f> &cloud);
         cv::Mat GetCSMImage();
     private:
         vector<vector<double>> cost_map_vector;
+        double max_log_likelihood;
+        cv::Mat image;
 
 };
 
