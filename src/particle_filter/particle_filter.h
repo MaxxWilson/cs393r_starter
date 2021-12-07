@@ -29,7 +29,7 @@
 #include "shared/util/random.h"
 #include "vector_map/vector_map.h"
 #include "visualization/visualization.h"
-#include "raster_map/cost_map.h"
+#include "raster_map/csm_map.h"
 
 #ifndef SRC_PARTICLE_FILTER_H_
 #define SRC_PARTICLE_FILTER_H_
@@ -108,7 +108,7 @@ class ParticleFilter {
 
   Eigen::Vector2f BaseLinkToSensorFrame(const Eigen::Vector2f &loc, const float &angle);
 
-  costmap::CostMap GetCSMMap();
+  csm_map::CSMMap GetCSMMap();
  private:
 
   // List of particles being tracked.
@@ -132,7 +132,7 @@ class ParticleFilter {
   // float first_odom_angle;
   // bool first_odom_flag = true;
   
-  costmap::CostMap csm_map_;
+  csm_map::CSMMap csm_map_;
   bool csm_map_initialized = false;
   std::vector<Eigen::Vector2f> scan_cloud_;
 

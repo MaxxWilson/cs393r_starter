@@ -127,6 +127,13 @@ namespace xy_raster_map
             return prob_map[xIdx][yIdx];
         }
 
+        /**
+         * @brief Getter for rasterized image
+         * 
+         * @return cv::Mat image
+         */
+        cv::Mat GetImage();
+
     protected:
         double map_length_dist;
         double dist_res;

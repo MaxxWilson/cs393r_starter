@@ -48,6 +48,10 @@ namespace xy_raster_map{
         max_likelihood = init_grid_val;
     }
 
+    cv::Mat XYRasterMap::GetImage(){
+        return image;
+    }
+
     float XYRasterMap::RoundToResolution(float value, float res) const{
         return ((float) ((int) (value/res + 0.5*math_util::Sign(value))))*res;
     }

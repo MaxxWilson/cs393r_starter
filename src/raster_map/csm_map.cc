@@ -13,22 +13,22 @@
 //  If not, see <http://www.gnu.org/licenses/>.
 //========================================================================
 /*!
-\file    cost_map.cc
-\brief   CostMap Implementation
+\file    csm_map.cc
+\brief   Implements XY Map for Correlative Scan Matching
 \author  Melissa Cruz, Yuhong Kan, Maxx Wilson
 */
 //========================================================================
 
 #include "shared/math/statistics.h"
-#include "cost_map.h"
+#include "csm_map.h"
 
-namespace costmap{
+namespace csm_map{
 
-    CostMap::CostMap() : xy_raster_map::XYRasterMap(){
+    CSMMap::CSMMap() : xy_raster_map::XYRasterMap(){
     
     }
 
-    CostMap::CostMap(
+    CSMMap::CSMMap(
         double map_half_dimension,
         double dist_res,
         double init_grid_val, 
@@ -45,7 +45,7 @@ namespace costmap{
      * 
      * @param cloud vector of cartesian laser scan points
      */
-    void CostMap::GenerateMapFromNewScan(const std::vector<Eigen::Vector2f> &cloud){
+    void CSMMap::GenerateMapFromNewScan(const std::vector<Eigen::Vector2f> &cloud){
         ClearMap();
 
         // For square kernel of odd size, length / 2 - 1, EX. 5x5 -> 2, 17x17 -> 8
@@ -92,7 +92,7 @@ namespace costmap{
         }
     }
 
-    void CostMap::UpdateCSMImage(){
+    void CSMMap::DrawCSMImage(){
         image = cv::Mat(row_num, row_num, CV_8UC3, cv::Scalar(255, 255, 255));
         for(int x = 0; x < row_num; x++){
             for(int y = 0; y < row_num; y++){
@@ -115,7 +115,7 @@ namespace costmap{
         }
     }
 
-    void CostMap::AddPointsToCSMImage(const std::vector<Eigen::Vector2f> &cloud){
+    void CSMMap::DrawScanCloudOnImage(const std::vector<Eigen::Vector2f> &cloud){
         for(Eigen::Vector2f point: cloud){
             try{
                 if(point.norm() >= range_max) {
@@ -124,8 +124,8 @@ namespace costmap{
                 double xIdx = GetIndexFromDist(point.x());
                 double yIdx = GetIndexFromDist(point.y());
                 if(xIdx < 0 || xIdx >= prob_map.size() || yIdx < 0 || yIdx >= prob_map[0].size()) throw std::out_of_range("Out of boundaries");
+                
                 int image_y = row_num - yIdx - 1;
-
                 for(int x = xIdx - 1; x <= xIdx + 1; x++){
                     for(int y = image_y - 1; y <= image_y + 1; y++){
                         image.at<cv::Vec3b>(y, x)[0] = 0;
@@ -140,33 +140,29 @@ namespace costmap{
         }
     }
 
-    cv::Mat CostMap::GetCSMImage(){
-        return image;
-    }
-
-    void CostMap::SetLogLikelihoodAtPosition(double x, double y, double likelihood){
+    void CSMMap::SetLogLikelihoodAtPosition(double x, double y, double likelihood){
         uint64_t xIdx = GetIndexFromDist(x);
         uint64_t yIdx = GetIndexFromDist(y);
         if(xIdx >= prob_map.size() || yIdx >= prob_map[0].size()) throw std::out_of_range("Out of boundaries");
         prob_map[xIdx][yIdx] = likelihood;
     }
 
-    double CostMap::GetLogLikelihoodAtPosition(double x, double y) const{
+    double CSMMap::GetLogLikelihoodAtPosition(double x, double y) const{
         uint64_t xIdx = GetIndexFromDist(x);
         uint64_t yIdx = GetIndexFromDist(y);
         if(xIdx >= prob_map.size() || yIdx >= prob_map[0].size()) throw std::out_of_range("Out of boundaries");
         return prob_map[xIdx][yIdx];
     }
 
-    double CostMap::GetNormalizedLikelihoodAtPosition(double x, double y) const{
+    double CSMMap::GetNormalizedLikelihoodAtPosition(double x, double y) const{
         return GetStandardLikelihoodAtPosition(x, y)/ConvertLogToStandard(max_likelihood);
     }
 
-    double CostMap::GetStandardLikelihoodAtPosition(double x, double y) const{
+    double CSMMap::GetStandardLikelihoodAtPosition(double x, double y) const{
         return ConvertLogToStandard(GetLogLikelihoodAtPosition(x, y));
     }
 
-    double CostMap::ConvertLogToStandard(double log_likelihood) const{
+    double CSMMap::ConvertLogToStandard(double log_likelihood) const{
         return 1/(sigma_observation*sqrt(2*M_PI))*exp(log_likelihood);
     }
-} // namespace CostMap
+} // namespace CSMMap

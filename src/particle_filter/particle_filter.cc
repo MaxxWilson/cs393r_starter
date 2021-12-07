@@ -376,12 +376,12 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
 
   // Initialize cloud on first laser msg
   if(!csm_map_initialized){
-    csm_map_ = costmap::CostMap(CONFIG_map_length_dist, CONFIG_dist_res, CONFIG_min_map_prob, CONFIG_range_max, CONFIG_sigma_observation);
+    csm_map_ = csm_map::CSMMap(CONFIG_map_length_dist, CONFIG_dist_res, CONFIG_min_map_prob, CONFIG_range_max, CONFIG_sigma_observation);
     scan_cloud_ = vector<Vector2f>(ranges.size());
 
     ConvertScanToPointCloud(angle_min, angle_increment, ranges, scan_cloud_);
     csm_map_.GenerateMapFromNewScan(scan_cloud_);
-    csm_map_.UpdateCSMImage();
+    csm_map_.DrawCSMImage();
     csm_map_initialized = true;
 
     for(std::size_t i = 0; i < scan_cloud_.size(); i++){
@@ -466,14 +466,14 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
 
     // Update cost map with new cloud_
     // csm_map_.UpdateCostMap(scan_cloud_);
-    csm_map_.UpdateCSMImage();
+    csm_map_.DrawCSMImage();
 
     vector<Vector2f> tf_scan(ranges.size());
-    for(int i = 0; i < tf_scan.size(); i++){
+    for(std::size_t i = 0; i < tf_scan.size(); i++){
       tf_scan[i] = Eigen::Rotation2D<float>(lidar_odom.angle)*scan_cloud_[i] + lidar_odom.translation;
     }
 
-    csm_map_.AddPointsToCSMImage(tf_scan);
+    csm_map_.DrawScanCloudOnImage(tf_scan);
   }                     
 }
 
@@ -595,7 +595,7 @@ Eigen::Vector2f ParticleFilter::BaseLinkToSensorFrame(const Eigen::Vector2f &loc
   return loc + Vector2f(CONFIG_laser_offset*cos(angle), CONFIG_laser_offset*sin(angle));
 }
 
-costmap::CostMap ParticleFilter::GetCSMMap(){
+csm_map::CSMMap ParticleFilter::GetCSMMap(){
   return csm_map_;
 }
 

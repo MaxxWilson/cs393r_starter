@@ -163,7 +163,7 @@ void PublishTFCubeImage(){
 
 void PublishScanImage(){
   // rosrun rqt_image_view rqt_image_view image:="/scan_image"
-  cv::Mat image = particle_filter_.GetCSMMap().GetCSMImage();
+  cv::Mat image = particle_filter_.GetCSMMap().GetImage();
   sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", image).toImageMsg();
   scan_image_publisher_.publish(msg);
 }
