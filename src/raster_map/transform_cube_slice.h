@@ -13,39 +13,34 @@
 //  If not, see <http://www.gnu.org/licenses/>.
 //========================================================================
 /*!
-\file    csm_map.h
-\brief   Implements XY Map for Correlative Scan Matching
+\file    transform_cube_slice.h
+\brief   Implements Likelihood Cube Display from Correlative Scan Matching
 \author  Melissa Cruz, Yuhong Kan, Maxx Wilson
 */
 //========================================================================
-
-#include "shared/math/line2d.h"
-#include "vector_map/vector_map.h"
 
 #include <vector>
 #include <utility>
 
 #include "raster_map/xy_raster_map.h"
 
-#ifndef CSM_MAP_H
-#define CSM_MAP_H
+#ifndef TRANSFORM_CUBE_SLICE_H_
+#define TRANSFORM_CUBE_SLICE_H_
 
-namespace csm_map{
+namespace transform_cube_slice {
 
-class CSMMap : public xy_raster_map::XYRasterMap {
+class TransformCubeSlice : public xy_raster_map::XYRasterMap {
     public:
-        CSMMap();
+        TransformCubeSlice();
 
         /**
-         * @brief Construct a new CSMMap object with initial size and grid values
+         * @brief Construct a new TransformCubeSlice object with initial size and grid values
          * 
          * @param map_dimension length/width of map in meters
          * @param dist_res dimension of map grid squares in meters
          * @param init_grid_val initial grid values as double
-         * @param range_max maximum range to consider scan points
-         * @param sigma_observation standard deviation of laser scan range
          */
-        CSMMap(double map_dimension, double dist_res, double init_grid_val,  double range_max, double sigma_observation);
+        TransformCubeSlice(double map_dimension, double dist_res, double init_grid_val);
 
         /**
          * @brief Clears scan map and regenerates given a new laser scan
@@ -118,4 +113,4 @@ class CSMMap : public xy_raster_map::XYRasterMap {
 
 }
 
-#endif   // CSM_MAP_H
+#endif   // TRANSFORM_CUBE_SLICE_H_

@@ -51,6 +51,11 @@ ADD_LIBRARY(collision_map
             src/raster_map/collision_map.cc
 )
 
+ADD_LIBRARY(transform_cube_slice
+            src/raster_map/xy_raster_map.cc
+            src/raster_map/transform_cube_slice.cc
+)
+
 ADD_SUBDIRECTORY(src/shared)
 INCLUDE_DIRECTORIES(src/shared)
 INCLUDE_DIRECTORIES(src)
