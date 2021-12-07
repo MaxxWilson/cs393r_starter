@@ -46,8 +46,8 @@ angle_update_thresh = 0.2 -- 15°
 dist_res = 0.01 -- 0.05 -- 50 cm
 theta_res = 0.01 -- 0.02 -- ~5°
 
-theta_search_const = 15
-dist_search_const = 15
+theta_search_const = 5
+dist_search_const = 5
 
 map_length_dist = dist_update_thresh + range_max + laser_offset + 4*sigma_observation + 0.5
 row_num = 2*(map_length_dist)/dist_res + 1

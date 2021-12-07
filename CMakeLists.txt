@@ -41,28 +41,35 @@ ADD_LIBRARY(shared_library
 ADD_LIBRARY(obstacle_avoidance
             src/obstacle_avoidance/obstacle_avoidance.cc)
 
+ADD_LIBRARY(cost_map
+            src/raster_map/xy_raster_map.cc
+            src/raster_map/cost_map.cc
+)
+
+ADD_LIBRARY(collision_map
+            src/raster_map/xy_raster_map.cc
+            src/raster_map/collision_map.cc
+)
+
 ADD_SUBDIRECTORY(src/shared)
 INCLUDE_DIRECTORIES(src/shared)
 INCLUDE_DIRECTORIES(src)
 
 ROSBUILD_ADD_EXECUTABLE(slam
-                        src/cost_map/cost_map.cc
                         src/slam/slam_main.cc
                         src/slam/slam.cc)
-TARGET_LINK_LIBRARIES(slam shared_library ${libs})
+TARGET_LINK_LIBRARIES(slam shared_library cost_map ${libs})
 
 
 ROSBUILD_ADD_EXECUTABLE(particle_filter
-                        src/cost_map/cost_map.cc
                         src/particle_filter/particle_filter_main.cc
                         src/particle_filter/particle_filter.cc)
-TARGET_LINK_LIBRARIES(particle_filter shared_library ${libs})
+TARGET_LINK_LIBRARIES(particle_filter shared_library cost_map ${libs})
 
 ROSBUILD_ADD_EXECUTABLE(navigation
-                        src/cost_map/cost_map.cc
                         src/navigation/navigation_main.cc
                         src/navigation/navigation.cc)
-TARGET_LINK_LIBRARIES(navigation shared_library obstacle_avoidance ${libs})
+TARGET_LINK_LIBRARIES(navigation shared_library obstacle_avoidance cost_map ${libs})
 
 ADD_EXECUTABLE(eigen_tutorial
                src/eigen_tutorial.cc)

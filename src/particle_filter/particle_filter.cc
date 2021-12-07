@@ -84,6 +84,9 @@ CONFIG_FLOAT(theta_res, "theta_res");
 CONFIG_FLOAT(theta_search_const, "theta_search_const");
 CONFIG_FLOAT(dist_search_const, "dist_search_const");
 
+CONFIG_DOUBLE(map_length_dist, "map_length_dist");
+CONFIG_DOUBLE(min_map_prob, "min_map_prob");
+
   Vector2f first_odom_loc;
   float first_odom_angle;
 
@@ -208,6 +211,10 @@ double GetRobustObservationLikelihood(double measured, double expected, double d
   else{
     return measured - expected;
   }
+}
+
+cv::Mat ParticleFilter::GetTFCubeImage(){
+  return cv::Mat();
 }
 
 // Update the weight of the particle based on how well it fits the observation
@@ -341,8 +348,8 @@ Pose2D<float> ParticleFilter::EstimateLidarOdometry(Pose2D<float> wheel_odometry
               }
           }
 
-          std::cout << "dtheta, dx, dy, obs " << ((float) ((int) (1000*dtheta)))/1000 << ", " << ((float) ((int) (1000*dx)))/1000 << ", " << ((float) ((int) (1000*dy)))/1000 << ", ";
-          std::cout << pose_log_prob << std::endl;
+          // std::cout << "dtheta, dx, dy, obs " << ((float) ((int) (1000*dtheta)))/1000 << ", " << ((float) ((int) (1000*dx)))/1000 << ", " << ((float) ((int) (1000*dy)))/1000 << ", ";
+          // std::cout << pose_log_prob << std::endl;
 
 
           // Update most likely transform
@@ -369,15 +376,15 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
 
   // Initialize cloud on first laser msg
   if(!csm_map_initialized){
-    csm_map_ = costmap::CostMap();
+    csm_map_ = costmap::CostMap(CONFIG_map_length_dist, CONFIG_dist_res, CONFIG_min_map_prob, CONFIG_range_max, CONFIG_sigma_observation);
     scan_cloud_ = vector<Vector2f>(ranges.size());
 
     ConvertScanToPointCloud(angle_min, angle_increment, ranges, scan_cloud_);
-    csm_map_.UpdateCostMap(scan_cloud_);
+    csm_map_.GenerateMapFromNewScan(scan_cloud_);
     csm_map_.UpdateCSMImage();
     csm_map_initialized = true;
 
-    for(int i = 0; i < scan_cloud_.size(); i++){
+    for(std::size_t i = 0; i < scan_cloud_.size(); i++){
       scan_cloud_[i] = Eigen::Rotation2D<float>(-angle)*(scan_cloud_[i] - test_trans);
     }
   }

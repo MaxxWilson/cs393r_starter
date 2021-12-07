@@ -19,19 +19,15 @@
 */
 //========================================================================
 
-#include "eigen3/Eigen/Dense"
-#include "eigen3/Eigen/Geometry"
-
 #include "shared/math/line2d.h"
 #include "vector_map/vector_map.h"
 #include "visualization/CImg.h"
 
-#include "ros/ros.h"
-#include "cv_bridge/cv_bridge.h"
-#include "image_transport/image_transport.h"
-
 #include <vector>
 #include <utility>
+
+#include "raster_map/xy_raster_map.h"
+
 using std::vector;
 using cimg_library::CImg;
 using cimg_library::CImgDisplay;
@@ -41,20 +37,23 @@ using cimg_library::CImgDisplay;
 
 namespace costmap{
 
-class CostMap{
+class CostMap : public xy_raster_map::XYRasterMap {
     public:
         CostMap();
 
+        /**
+         * @brief Construct a new CostMap object with initial size and grid values
+         * 
+         * @param map_dimension length/width of map in meters
+         * @param dist_res dimension of map grid squares in meters
+         * @param init_grid_val initial grid values as double
+         */
+        CostMap(double map_dimension, double dist_res, double init_grid_val,  double range_max, double sigma_observation);
+
         //Updates rasterized cost table given a new laser scan  
-        void UpdateCostMap(const std::vector<Eigen::Vector2f> &cloud);
-        
-        void DrawCostMap(CImg<float> &image);
+        void GenerateMapFromNewScan(const std::vector<Eigen::Vector2f> &cloud);
 
-        void DisplayImage(CImg<float> &image);
-        
-        void UpdateCollisionMap(const std::vector<geometry::line2f> lines);
-
-        void SetLikelihoodAtPosition(double x, double y, double likelihood);
+        void SetLogLikelihoodAtPosition(double x, double y, double likelihood);
 
         double GetLogLikelihoodAtPosition(double x, double y) const;
 
@@ -64,35 +63,12 @@ class CostMap{
 
         double ConvertLogToStandard(double log_likelihood) const;
 
-        int GetIndexFromDist(double dist) const;
-
-        std::pair<int, int> GetIndexPairFromDist(Eigen::Vector2f loc) const;
-
-        Eigen::Vector2f GetLocFromIndex(int xIdx, int yIdx) const;
-
-        float RoundToResolution(float value, float res) const;
-
-        void ClearMap();
-
-        inline int GetRowNum() const {
-            return cost_map_vector.size();
-        };
-
-        inline int GetColNum() const {
-            return cost_map_vector[0].size();
-        };
-
-        inline double GetValueAtIdx(int xIdx, int yIdx) const{
-            return cost_map_vector[xIdx][yIdx];
-        }
-
         void UpdateCSMImage();
         void AddPointsToCSMImage(const std::vector<Eigen::Vector2f> &cloud);
         cv::Mat GetCSMImage();
     private:
-        vector<vector<double>> cost_map_vector;
-        double max_log_likelihood;
-        cv::Mat image;
+        double range_max;
+        double sigma_observation;
 
 };
 

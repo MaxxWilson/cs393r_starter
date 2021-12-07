@@ -87,9 +87,11 @@ particle_filter::ParticleFilter particle_filter_;
 ros::Publisher visualization_publisher_;
 ros::Publisher localization_publisher_;
 ros::Publisher laser_publisher_;
-ros::Publisher scan_image_publisher_;
 VisualizationMsg vis_msg_;
 sensor_msgs::LaserScan last_laser_msg_;
+
+ros::Publisher scan_image_publisher_;
+ros::Publisher transform_cube_image_publisher_;
 
 vector<Vector2f> trajectory_points_;
 
@@ -150,6 +152,13 @@ void PublishTrajectory() {
              kColor,
              vis_msg_);
   }
+}
+
+void PublishTFCubeImage(){
+  // rosrun rqt_image_view rqt_image_view image:="/scan_image"
+  cv::Mat image = particle_filter_.GetTFCubeImage();
+  sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", image).toImageMsg();
+  transform_cube_image_publisher_.publish(msg);
 }
 
 void PublishScanImage(){
@@ -278,6 +287,8 @@ int main(int argc, char** argv) {
       n.advertise<sensor_msgs::LaserScan>("scan", 1);
   scan_image_publisher_ =
       n.advertise<sensor_msgs::Image>("scan_image", 1);
+  transform_cube_image_publisher_ =
+      n.advertise<sensor_msgs::Image>("tf_cube_image", 1);
 
   ProcessLive(&n);
 

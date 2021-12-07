@@ -29,7 +29,7 @@
 #include "shared/util/random.h"
 #include "vector_map/vector_map.h"
 #include "visualization/visualization.h"
-#include "cost_map/cost_map.h"
+#include "raster_map/cost_map.h"
 
 #ifndef SRC_PARTICLE_FILTER_H_
 #define SRC_PARTICLE_FILTER_H_
@@ -104,6 +104,7 @@ class ParticleFilter {
                               std::vector<Eigen::Vector2f>* scan);
 
   void SetParticlesForTesting(std::vector<Particle> new_particles);
+  cv::Mat GetTFCubeImage();
 
   Eigen::Vector2f BaseLinkToSensorFrame(const Eigen::Vector2f &loc, const float &angle);
 
