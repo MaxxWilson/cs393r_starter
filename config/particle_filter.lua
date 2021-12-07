@@ -6,7 +6,7 @@ init_r = 0
 -- Vehicle Constants --
 laser_offset = 0.2
 range_min = 0.02
-range_max = 5.0
+range_max = 9.5
 
 -- Initial cloud distribution --
 init_x_sigma = 0.3 -- 99% of the time, within a meter
@@ -43,11 +43,12 @@ dist_update_thresh = 0.3
 angle_update_thresh = 0.2 -- 15°
 
 -- CSM Search --
-dist_res = 0.02 -- 0.05 -- 50 cm
-theta_res = 0.01 -- 0.02 -- ~5°
+dist_res = 0.03 -- 0.05 -- 50 cm
+theta_res = 0.02 -- 0.02 -- ~5°
+csm_eval_range_max = 5.0
 
-theta_search_const = 2
-dist_search_const = 30
+theta_search_const = 10
+dist_search_const = 20
 
 map_length_dist = dist_update_thresh + range_max + laser_offset + 4*sigma_observation + 0.5
 row_num = 2*(map_length_dist)/dist_res + 1

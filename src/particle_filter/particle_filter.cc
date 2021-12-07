@@ -86,6 +86,7 @@ CONFIG_FLOAT(dist_search_const, "dist_search_const");
 
 CONFIG_DOUBLE(map_length_dist, "map_length_dist");
 CONFIG_DOUBLE(min_map_prob, "min_map_prob");
+CONFIG_DOUBLE(csm_eval_range_max, "csm_eval_range_max");
 
   Vector2f first_odom_loc;
   float first_odom_angle;
@@ -367,7 +368,7 @@ Pose2D<float> ParticleFilter::EstimateLidarOdometry(Pose2D<float> wheel_odometry
             Vector2f scanPos = Eigen::Rotation2Df(angle_diff) * scan_cloud_[i] + trans_diff;
     
             // Ignore scans that don't hit an object
-            if(scanPos.norm() >= CONFIG_range_max) {
+            if(scanPos.norm() >= CONFIG_csm_eval_range_max) {
               continue;
             }
 
@@ -413,7 +414,7 @@ Pose2D<float> ParticleFilter::EstimateLidarOdometry(Pose2D<float> wheel_odometry
           Vector2f scanPos = Eigen::Rotation2Df(angle_diff) * scan_cloud_[i] + trans_diff;
   
           // Ignore scans that don't hit an object
-          if(scanPos.norm() >= CONFIG_range_max) {
+          if(scanPos.norm() >= CONFIG_csm_eval_range_max) {
             continue;
           }
 
@@ -479,7 +480,7 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
     weight_bins_.resize(particles_.size());
     std::fill(weight_bins_.begin(), weight_bins_.end(), 0);
 
-    // ConvertScanToPointCloud(angle_min, angle_increment, ranges, scan_cloud_);
+    ConvertScanToPointCloud(angle_min, angle_increment, ranges, scan_cloud_);
 
     // Estimate Lidar Odometry for new laser scan
     Pose2D<float> wheel_odom(delta_angle, odom_loc_diff);
@@ -535,7 +536,7 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
     // i++;
 
     // Update cost map with new cloud_
-    // csm_map_.UpdateCostMap(scan_cloud_);
+    csm_map_.GenerateMapFromNewScan(scan_cloud_);
     csm_map_.DrawCSMImage();
 
     vector<Vector2f> tf_scan(ranges.size());
