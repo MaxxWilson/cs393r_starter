@@ -112,6 +112,14 @@ class ParticleFilter {
 
   csm_map::CSMMap GetCSMMap();
  private:
+  Eigen::Vector2f mean_odom_;
+  float mean_angle_;
+  Eigen::Matrix3f K_;
+  float s_;
+  void InitializeCovariance();
+  void ComputeCovariance(Eigen::Vector2f odom, float angle, float prob);
+  Eigen::Matrix3f ComputeCovariance();
+
 
   // List of particles being tracked.
   std::vector<Particle> particles_;

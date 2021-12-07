@@ -6,7 +6,7 @@ init_r = 0
 -- Vehicle Constants --
 laser_offset = 0.2
 range_min = 0.02
-range_max = 10.0
+range_max = 5.0
 
 -- Initial cloud distribution --
 init_x_sigma = 0.3 -- 99% of the time, within a meter
@@ -28,8 +28,8 @@ min_update_angle = 0.2
 num_particles = 100 -- Increase until computation runs out
 resize_factor = 20          -- # num_points / resize_factor = num_rays
 
-sigma_observation = 0.2    -- Prof recommends 0.15-0.2 based on sensor specs
-gamma = 0.05 -- 0.01                -- TODO Experimental tuning
+sigma_observation = 0.1    -- Prof recommends 0.15-0.2 based on sensor specs
+gamma = 0.005 -- 0.01                -- TODO Experimental tuning
 
 -- Limits maximum weight error --
 -- Increasing these makes it harsher on short/long errors for scan
@@ -43,11 +43,11 @@ dist_update_thresh = 0.3
 angle_update_thresh = 0.2 -- 15°
 
 -- CSM Search --
-dist_res = 0.01 -- 0.05 -- 50 cm
+dist_res = 0.02 -- 0.05 -- 50 cm
 theta_res = 0.01 -- 0.02 -- ~5°
 
-theta_search_const = 5
-dist_search_const = 5
+theta_search_const = 2
+dist_search_const = 30
 
 map_length_dist = dist_update_thresh + range_max + laser_offset + 4*sigma_observation + 0.5
 row_num = 2*(map_length_dist)/dist_res + 1

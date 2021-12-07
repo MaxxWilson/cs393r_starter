@@ -50,7 +50,7 @@ namespace csm_map{
 
         // For square kernel of odd size, length / 2 - 1, EX. 5x5 -> 2, 17x17 -> 8
         // Size Kernel based on Std of sensor measurement, where past 3 sigma probabilty falls off to zero
-        int kernel_half_width = 3 * sigma_observation / dist_res;
+        int kernel_half_width = 10 * sigma_observation / dist_res;
 
         // Iterate through rays in scan
         for(std::size_t i = 0; i < cloud.size(); i++){
@@ -126,8 +126,8 @@ namespace csm_map{
                 if(xIdx < 0 || xIdx >= prob_map.size() || yIdx < 0 || yIdx >= prob_map[0].size()) throw std::out_of_range("Out of boundaries");
                 
                 int image_y = row_num - yIdx - 1;
-                for(int x = xIdx - 1; x <= xIdx + 1; x++){
-                    for(int y = image_y - 1; y <= image_y + 1; y++){
+                for(int x = xIdx; x <= xIdx; x++){
+                    for(int y = image_y; y <= image_y; y++){
                         image.at<cv::Vec3b>(y, x)[0] = 0;
                         image.at<cv::Vec3b>(y, x)[1] = 0;
                         image.at<cv::Vec3b>(y, x)[2] = 0;
@@ -140,29 +140,29 @@ namespace csm_map{
         }
     }
 
-    void CSMMap::SetLogLikelihoodAtPosition(double x, double y, double likelihood){
+    void CSMMap::SetLogLikelihoodAtPosition(const double x, const double y, double likelihood){
         uint64_t xIdx = GetIndexFromDist(x);
         uint64_t yIdx = GetIndexFromDist(y);
         if(xIdx >= prob_map.size() || yIdx >= prob_map[0].size()) throw std::out_of_range("Out of boundaries");
         prob_map[xIdx][yIdx] = likelihood;
     }
 
-    double CSMMap::GetLogLikelihoodAtPosition(double x, double y) const{
+    double CSMMap::GetLogLikelihoodAtPosition(const double x, const double y) const{
         uint64_t xIdx = GetIndexFromDist(x);
         uint64_t yIdx = GetIndexFromDist(y);
         if(xIdx >= prob_map.size() || yIdx >= prob_map[0].size()) throw std::out_of_range("Out of boundaries");
         return prob_map[xIdx][yIdx];
     }
 
-    double CSMMap::GetNormalizedLikelihoodAtPosition(double x, double y) const{
+    double CSMMap::GetNormalizedLikelihoodAtPosition(const double x, const double y) const{
         return GetStandardLikelihoodAtPosition(x, y)/ConvertLogToStandard(max_likelihood);
     }
 
-    double CSMMap::GetStandardLikelihoodAtPosition(double x, double y) const{
+    double CSMMap::GetStandardLikelihoodAtPosition(const double x, const double y) const{
         return ConvertLogToStandard(GetLogLikelihoodAtPosition(x, y));
     }
 
-    double CSMMap::ConvertLogToStandard(double log_likelihood) const{
+    double CSMMap::ConvertLogToStandard(const double log_likelihood) const{
         return 1/(sigma_observation*sqrt(2*M_PI))*exp(log_likelihood);
     }
 } // namespace CSMMap

@@ -52,17 +52,17 @@ namespace xy_raster_map{
         return image;
     }
 
-    float XYRasterMap::RoundToResolution(float value, float res) const{
+    float XYRasterMap::RoundToResolution(const float value, const float res) const{
         return ((float) ((int) (value/res + 0.5*math_util::Sign(value))))*res;
     }
 
-    int XYRasterMap::GetIndexFromDist(double dist) const{
+    int XYRasterMap::GetIndexFromDist(const double dist) const{
         float dist_rounded = RoundToResolution(dist, dist_res);
         float lower_bound = RoundToResolution(-(map_length_dist), dist_res);
         return (int) RoundToResolution((dist_rounded - lower_bound) / dist_res, 1.0); // integer round using dist_res/2
     }
 
-    std::pair<int, int> XYRasterMap::GetIndexPairFromDist(Eigen::Vector2f loc) const {
+    std::pair<int, int> XYRasterMap::GetIndexPairFromDist(const Eigen::Vector2f loc) const {
         int xIdx = GetIndexFromDist(loc.x());
         int yIdx = GetIndexFromDist(loc.y());
         return std::make_pair(xIdx, yIdx);

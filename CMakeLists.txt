@@ -69,7 +69,7 @@ TARGET_LINK_LIBRARIES(slam shared_library csm_map ${libs})
 ROSBUILD_ADD_EXECUTABLE(particle_filter
                         src/particle_filter/particle_filter_main.cc
                         src/particle_filter/particle_filter.cc)
-TARGET_LINK_LIBRARIES(particle_filter shared_library csm_map ${libs})
+TARGET_LINK_LIBRARIES(particle_filter shared_library csm_map transform_cube_slice ${libs})
 
 ROSBUILD_ADD_EXECUTABLE(navigation
                         src/navigation/navigation_main.cc

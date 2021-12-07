@@ -155,7 +155,7 @@ void PublishTrajectory() {
 }
 
 void PublishTFCubeImage(){
-  // rosrun rqt_image_view rqt_image_view image:="/scan_image"
+  // rosrun rqt_image_view rqt_image_view image:="/tf_cube_image"
   cv::Mat image = particle_filter_.GetTFCubeImage();
   sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", image).toImageMsg();
   transform_cube_image_publisher_.publish(msg);
@@ -182,6 +182,7 @@ void PublishVisualization() {
   PublishPredictedScan();
   PublishTrajectory();
   PublishScanImage();
+  PublishTFCubeImage();
   visualization_publisher_.publish(vis_msg_);
 }
 

@@ -61,7 +61,7 @@ class CSMMap : public xy_raster_map::XYRasterMap {
          * @param y y distance in meters
          * @param likelihood log likelihood as a double
          */
-        void SetLogLikelihoodAtPosition(double x, double y, double likelihood);
+        void SetLogLikelihoodAtPosition(const double x, const double y, const double likelihood);
 
         /**
          * @brief Get the Log Likelihood at given position
@@ -70,7 +70,7 @@ class CSMMap : public xy_raster_map::XYRasterMap {
          * @param y y distance in meters
          * @return double log likelihood
          */
-        double GetLogLikelihoodAtPosition(double x, double y) const;
+        double GetLogLikelihoodAtPosition(const double x, const double y) const;
 
         /**
          * @brief Get the Likelihood at given position normalzied by the max value in image
@@ -79,7 +79,7 @@ class CSMMap : public xy_raster_map::XYRasterMap {
          * @param y y distance in meters
          * @param likelihood normalized likelihood as a double
          */
-        double GetNormalizedLikelihoodAtPosition(double x, double y) const;
+        double GetNormalizedLikelihoodAtPosition(const double x, const double y) const;
 
         /**
          * @brief Get the Likelihood at given position as standard gaussian probability (area under curve of 1)
@@ -88,7 +88,7 @@ class CSMMap : public xy_raster_map::XYRasterMap {
          * @param y y distance in meters
          * @param likelihood standard likelihood as a double
          */
-        double GetStandardLikelihoodAtPosition(double x, double y) const;
+        double GetStandardLikelihoodAtPosition(const double x, const double y) const;
 
         /**
          * @brief Converts log likelihood to standard gaussian probability sample
@@ -96,7 +96,7 @@ class CSMMap : public xy_raster_map::XYRasterMap {
          * @param log_likelihood 
          * @return double standard likelihood
          */
-        double ConvertLogToStandard(double log_likelihood) const;
+        double ConvertLogToStandard(const double log_likelihood) const;
 
         /**
          * @brief updates image object, drawing the current values in the probability map
