@@ -143,6 +143,8 @@ class ParticleFilter {
   // bool first_odom_flag = true;
   
   csm_map::CSMMap csm_map_;
+  csm_map::CSMMap debug_csm_map_;
+  csm_map::CSMMap low_csm_map_;
   transform_cube_slice::TransformCubeSlice likelihood_cube_;
   bool csm_map_initialized = false;
   std::vector<Eigen::Vector2f> scan_cloud_;

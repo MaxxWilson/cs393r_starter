@@ -43,9 +43,12 @@ dist_update_thresh = 0.3
 angle_update_thresh = 0.2 -- 15°
 
 -- CSM Search --
+
+low_dist_res = 0.3 -- 0.05 -- 50 cm
+
 dist_res = 0.03 -- 0.05 -- 50 cm
 theta_res = 0.02 -- 0.02 -- ~5°
-csm_eval_range_max = 5.0
+csm_eval_range_max =  5.0
 
 theta_search_const = 10
 dist_search_const = 20

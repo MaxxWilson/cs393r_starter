@@ -78,6 +78,7 @@ CONFIG_INT(resample_frequency, "resample_frequency");
 CONFIG_INT(row_num, "row_num");
 
 // CSM
+CONFIG_FLOAT(low_dist_res, "low_dist_res");
 CONFIG_FLOAT(dist_res, "dist_res");
 CONFIG_FLOAT(theta_res, "theta_res");
 
@@ -341,25 +342,35 @@ Pose2D<float> ParticleFilter::EstimateLidarOdometry(Pose2D<float> wheel_odometry
 
     likelihood_cube_ = transform_cube_slice::TransformCubeSlice((2*CONFIG_dist_res + translation_high - translation_low)/2, CONFIG_dist_res, -1e5);
 
+    double low_P = -1e10;   // Log Probability of pose
     double P = -1e10;   // Log Probability of pose
+    double debug_P = -1e10;   // For debug
+    
+    std::vector<std::vector<std::vector<double>>> low_res_probs((int)((theta_high - theta_low) / CONFIG_theta_res) + 1, 
+                                                                std::vector<std::vector<double>>((int)((theta_high - theta_low) / CONFIG_theta_res) + 1, 
+                                                                std::vector<double>((int)((theta_high - theta_low) / CONFIG_theta_res) + 1)));
+    Pose2D<float> low_T;
     Pose2D<float> T;
+    Pose2D<float> debug_T;
     InitializeCovariance();
+    int best_x_index = 0;
+    int best_y_index = 0;
     // For each change in theta
     for(int angle_index = 0; angle_index <= (theta_high - theta_low) / CONFIG_theta_res; angle_index++){
       float dtheta = theta_low + angle_index * CONFIG_theta_res;
       float angle_diff = csm_map_.RoundToResolution(wheel_odometry.angle + dtheta, CONFIG_theta_res);
-
-      // For each possible X
-      for(int x_index = 0; x_index <= (translation_high - translation_low) / CONFIG_dist_res; x_index++){
-        float dx = translation_low + x_index * CONFIG_dist_res;
+      // Low Resolution
+      
+      for(int x_index = 0; x_index <= (translation_high - translation_low) / CONFIG_low_dist_res; x_index++){
+        float dx = translation_low + x_index * CONFIG_low_dist_res;
         Vector2f trans_diff;
-        trans_diff[0] = csm_map_.RoundToResolution(wheel_odometry.translation.x() + dx, CONFIG_dist_res);
+        trans_diff[0] = low_csm_map_.RoundToResolution(wheel_odometry.translation.x() + dx, CONFIG_low_dist_res);
         
         // For each possible Y
-        for(int y_index = 0; y_index <= (translation_high - translation_low) / CONFIG_dist_res; y_index++){
-          float dy = translation_low + y_index * CONFIG_dist_res;
+        for(int y_index = 0; y_index <= (translation_high - translation_low) / CONFIG_low_dist_res; y_index++){
+          float dy = translation_low + y_index * CONFIG_low_dist_res;
           double pose_log_prob = 0.0;
-          trans_diff[1] = csm_map_.RoundToResolution(wheel_odometry.translation.y() + dy, CONFIG_dist_res);
+          trans_diff[1] = low_csm_map_.RoundToResolution(wheel_odometry.translation.y() + dy, CONFIG_low_dist_res);
           
           // For each point in scan
           for(std::size_t i = 0; i < scan_cloud_.size(); i++){
@@ -373,7 +384,7 @@ Pose2D<float> ParticleFilter::EstimateLidarOdometry(Pose2D<float> wheel_odometry
             }
 
             try{
-              double gaussian_prob = csm_map_.GetLogLikelihoodAtPosition(scanPos.x(), scanPos.y());
+              double gaussian_prob = low_csm_map_.GetLogLikelihoodAtPosition(scanPos.x(), scanPos.y());
               pose_log_prob += CONFIG_gamma*gaussian_prob;
               
             } catch(std::out_of_range) {
@@ -381,20 +392,183 @@ Pose2D<float> ParticleFilter::EstimateLidarOdometry(Pose2D<float> wheel_odometry
             }
           }
 
-          std::cout << "dtheta, dx, dy, obs " << ((float) ((int) (1000*dtheta)))/1000 << ", " << ((float) ((int) (1000*dx)))/1000 << ", " << ((float) ((int) (1000*dy)))/1000 << ", ";
-          std::cout << pose_log_prob << std::endl;
-          ComputeCovariance(trans_diff + last_update_loc_, angle_diff + last_update_angle_, pose_log_prob);
+          // std::cout << "low Resolution: dtheta, dx, dy, obs " << ((float) ((int) (1000*dtheta)))/1000 << ", " << ((float) ((int) (1000*dx)))/1000 << ", " << ((float) ((int) (1000*dy)))/1000 << ", ";
+          // std::cout << pose_log_prob << std::endl;
+          
           // Update most likely transform
-          if( P < pose_log_prob){
-            P = pose_log_prob ;
-            T = Pose2D<float>(angle_diff, trans_diff);
+
+          low_res_probs[angle_index][x_index][y_index] = pose_log_prob;
+          if( low_P < pose_log_prob){
+            low_T = Pose2D<float>(angle_diff, trans_diff);
+            low_P = pose_log_prob ;
+            best_x_index = x_index;
+            best_y_index = y_index;
           }
         }
-      }      
-    }
+      }     
 
+      
+
+      // std::cout << "high_res_start_x_idx, high_res_end_x_idx:" << high_res_start_x_idx << ", " << high_res_end_x_idx << std::endl;
+      // std::cout << "high_res_start_y_idx, high_res_end_y_idx:" << high_res_start_y_idx << ", " << high_res_end_y_idx << std::endl;
+      for(int x_index = 0; x_index <= (translation_high - translation_low) / CONFIG_dist_res; x_index++){
+        float dx = translation_low + x_index * CONFIG_dist_res;
+        Vector2f trans_diff;
+        trans_diff[0] = debug_csm_map_.RoundToResolution(wheel_odometry.translation.x() + dx, CONFIG_dist_res);
+        
+        
+        for(int y_index = 0; y_index <= (translation_high - translation_low) / CONFIG_dist_res; y_index++){
+          float dy = translation_low + y_index * CONFIG_dist_res;
+          double pose_log_prob = 0.0;
+          trans_diff[1] = debug_csm_map_.RoundToResolution(wheel_odometry.translation.y() + dy, CONFIG_dist_res);
+          
+          // For each point in scan
+          for(std::size_t i = 0; i < scan_cloud_.size(); i++){
+
+            // Transform new point into frame of previous scan / reference image
+            Vector2f scanPos = Eigen::Rotation2Df(angle_diff) * scan_cloud_[i] + trans_diff;
+    
+            // Ignore scans that don't hit an object
+            if(scanPos.norm() >= CONFIG_csm_eval_range_max) {
+              continue;
+            }
+
+            try{
+              double gaussian_prob = debug_csm_map_.GetLogLikelihoodAtPosition(scanPos.x(), scanPos.y());
+              pose_log_prob += CONFIG_gamma*gaussian_prob;
+              
+            } catch(std::out_of_range) {
+              continue;
+            }
+          }
+
+          // std::cout << "dtheta, dx, dy, obs " << ((float) ((int) (1000*dtheta)))/1000 << ", " << ((float) ((int) (1000*dx)))/1000 << ", " << ((float) ((int) (1000*dy)))/1000 << ", ";
+          // std::cout << pose_log_prob << std::endl;
+          ComputeCovariance(trans_diff + last_update_loc_, angle_diff + last_update_angle_, pose_log_prob);
+          // Update most likely transform
+          if( debug_P < pose_log_prob){
+            debug_P = pose_log_prob ;
+            debug_T = Pose2D<float>(angle_diff, trans_diff);
+          }
+        }
+      }
+    }
+    // High resolution
+    double H = 0; 
+    int high_res_start_x_idx = (translation_low + best_x_index * CONFIG_low_dist_res) / (CONFIG_dist_res) - 1;
+    int high_res_end_x_idx = (translation_low + (best_x_index + 1) * CONFIG_low_dist_res) / (CONFIG_dist_res) + 1;
+    int high_res_start_y_idx = (translation_low + best_y_index * CONFIG_low_dist_res) / (CONFIG_dist_res) - 1;
+    int high_res_end_y_idx = (translation_low + (best_y_index + 1) * CONFIG_low_dist_res) / (CONFIG_dist_res) + 1;
+    for(int x_index = high_res_start_x_idx; x_index <= high_res_end_x_idx; x_index++){
+      float dx = translation_low + x_index * CONFIG_dist_res;
+      Vector2f trans_diff;
+      trans_diff[0] = csm_map_.RoundToResolution(wheel_odometry.translation.x() + dx, CONFIG_dist_res);
+      for(int y_index = high_res_start_y_idx; y_index <= high_res_end_y_idx; y_index++){
+        float dy = translation_low + y_index * CONFIG_dist_res;
+        double pose_log_prob = 0.0;
+        trans_diff[1] = csm_map_.RoundToResolution(wheel_odometry.translation.y() + dy, CONFIG_dist_res);
+        
+        // For each point in scan
+        for(std::size_t i = 0; i < scan_cloud_.size(); i++){
+
+          // Transform new point into frame of previous scan / reference image
+          Vector2f scanPos = Eigen::Rotation2Df(low_T.angle) * scan_cloud_[i] + trans_diff;
+  
+          // Ignore scans that don't hit an object
+          if(scanPos.norm() >= CONFIG_csm_eval_range_max) {
+            continue;
+          }
+
+          try{
+            double gaussian_prob = csm_map_.GetLogLikelihoodAtPosition(scanPos.x(), scanPos.y());
+            pose_log_prob += CONFIG_gamma*gaussian_prob;
+            
+          } catch(std::out_of_range) {
+            continue;
+          }
+        }
+        // H += pose_log_prob;
+        // std::cout << "dtheta, dx, dy, obs " << ((float) ((int) (1000*dtheta)))/1000 << ", " << ((float) ((int) (1000*dx)))/1000 << ", " << ((float) ((int) (1000*dy)))/1000 << ", ";
+        // std::cout << pose_log_prob << std::endl;
+        // ComputeCovariance(trans_diff + last_update_loc_, angle_diff + last_update_angle_, pose_log_prob);
+        // Update most likely transform
+        if( H < pose_log_prob){
+          H = pose_log_prob ;
+          if(H > low_P) {
+            std::cout << "wrong\n";
+          }
+          // T = Pose2D<float>(angle_diff, trans_diff);
+        }
+      }
+    } 
+    for(int res_angle = 0; res_angle <= (theta_high - theta_low) / CONFIG_theta_res; res_angle++) {
+      float dtheta = theta_low + res_angle * CONFIG_theta_res;
+      float angle_diff = csm_map_.RoundToResolution(wheel_odometry.angle + dtheta, CONFIG_theta_res);
+      for(int low_res_x = 0; low_res_x <= (translation_high - translation_low) / CONFIG_low_dist_res; low_res_x++) {
+        for(int low_res_y = 0; low_res_y <= (translation_high - translation_low) / CONFIG_low_dist_res; low_res_y++) {
+          // std::cout << low_res_probs[res_angle][low_res_x][low_res_y] << std::endl;
+          if(low_res_probs[res_angle][low_res_x][low_res_y] >= H) {
+            // High resolution
+            // std::cout << low_res_x  << "," << low_res_y << std::endl;
+            high_res_start_x_idx = (translation_low + low_res_x * CONFIG_low_dist_res) / (CONFIG_dist_res) - 1;
+            high_res_end_x_idx = (translation_low + (low_res_x + 1) * CONFIG_low_dist_res) / (CONFIG_dist_res) + 1;
+            high_res_start_y_idx = (translation_low + low_res_y * CONFIG_low_dist_res) / (CONFIG_dist_res) - 1;
+            high_res_end_y_idx = (translation_low + (low_res_y + 1) * CONFIG_low_dist_res) / (CONFIG_dist_res) + 1;
+            for(int x_index = high_res_start_x_idx; x_index <= high_res_end_x_idx; x_index++){
+              float dx = translation_low + x_index * CONFIG_dist_res;
+              Vector2f trans_diff;
+              trans_diff[0] = csm_map_.RoundToResolution(wheel_odometry.translation.x() + dx, CONFIG_dist_res);
+
+
+              for(int y_index = high_res_start_y_idx; y_index <= high_res_end_y_idx; y_index++){
+                float dy = translation_low + y_index * CONFIG_dist_res;
+                double pose_log_prob = 0.0;
+                trans_diff[1] = csm_map_.RoundToResolution(wheel_odometry.translation.y() + dy, CONFIG_dist_res);
+
+                // For each point in scan
+                for(std::size_t i = 0; i < scan_cloud_.size(); i++){
+
+                  // Transform new point into frame of previous scan / reference image
+                  Vector2f scanPos = Eigen::Rotation2Df(angle_diff) * scan_cloud_[i] + trans_diff;
+
+                  // Ignore scans that don't hit an object
+                  if(scanPos.norm() >= CONFIG_csm_eval_range_max) {
+                    continue;
+                  }
+
+                  try{
+                    double gaussian_prob = csm_map_.GetLogLikelihoodAtPosition(scanPos.x(), scanPos.y());
+                    pose_log_prob += CONFIG_gamma*gaussian_prob;
+
+                  } catch(std::out_of_range) {
+                    continue;
+                  }
+                }
+
+                // std::cout << "dtheta, dx, dy, obs " << ((float) ((int) (1000*dtheta)))/1000 << ", " << ((float) ((int) (1000*dx)))/1000 << ", " << ((float) ((int) (1000*dy)))/1000 << ", ";
+                // std::cout << pose_log_prob << std::endl;
+                // ComputeCovariance(trans_diff + last_update_loc_, angle_diff + last_update_angle_, pose_log_prob);
+                // Update most likely transform
+                if( H < pose_log_prob){
+                  H = pose_log_prob ;
+                  T = Pose2D<float>(angle_diff, trans_diff);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    
+
+    if(debug_T.angle == T.angle && debug_T.translation[0] == T.translation[0] && debug_T.translation[1] == T.translation[1]) {
+        std::cout << "Match\n";
+    } else {
+        std::cout << "debug_T:(" << debug_T.angle << "," << debug_T.translation[0] << "," << debug_T.translation[1] << ")\n";
+        std::cout << "T:(" << T.angle << "," << T.translation[0] << "," << T.translation[1] << ")\n";
+    }
     // Build probability slice for the most likely theta
-    float angle_diff = csm_map_.RoundToResolution(T.angle, CONFIG_theta_res);
+    float angle_diff = T.angle;
     // For each possible X
     for(int x_index = 0; x_index <= (translation_high - translation_low) / CONFIG_dist_res; x_index++){
       float dx = translation_low + x_index * CONFIG_dist_res;
@@ -448,10 +622,16 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
   // Initialize cloud on first laser msg
   if(!csm_map_initialized){
     csm_map_ = csm_map::CSMMap(CONFIG_map_length_dist, CONFIG_dist_res, CONFIG_min_map_prob, CONFIG_range_max, CONFIG_sigma_observation);
+    debug_csm_map_ = csm_map::CSMMap(CONFIG_map_length_dist, CONFIG_dist_res, CONFIG_min_map_prob, CONFIG_range_max, CONFIG_sigma_observation);
+    low_csm_map_ = csm_map::CSMMap(CONFIG_map_length_dist, CONFIG_low_dist_res, CONFIG_min_map_prob, CONFIG_range_max, CONFIG_sigma_observation);
     scan_cloud_ = vector<Vector2f>(ranges.size());
 
     ConvertScanToPointCloud(angle_min, angle_increment, ranges, scan_cloud_);
     csm_map_.GenerateMapFromNewScan(scan_cloud_);
+    low_csm_map_.GenerateMapFromNewScan(scan_cloud_);
+    debug_csm_map_.GenerateMapFromNewScan(scan_cloud_);
+
+
     csm_map_.DrawCSMImage();
     csm_map_initialized = true;
 
@@ -537,6 +717,8 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
 
     // Update cost map with new cloud_
     csm_map_.GenerateMapFromNewScan(scan_cloud_);
+    low_csm_map_.GenerateMapFromNewScan(scan_cloud_);
+    debug_csm_map_.GenerateMapFromNewScan(scan_cloud_);
     csm_map_.DrawCSMImage();
 
     vector<Vector2f> tf_scan(ranges.size());
