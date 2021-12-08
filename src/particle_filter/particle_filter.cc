@@ -411,6 +411,7 @@ Pose2D<float> ParticleFilter::EstimateLidarOdometry(Pose2D<float> wheel_odometry
 
       // std::cout << "high_res_start_x_idx, high_res_end_x_idx:" << high_res_start_x_idx << ", " << high_res_end_x_idx << std::endl;
       // std::cout << "high_res_start_y_idx, high_res_end_y_idx:" << high_res_start_y_idx << ", " << high_res_end_y_idx << std::endl;
+      // original version for debug usage
       for(int x_index = 0; x_index <= (translation_high - translation_low) / CONFIG_dist_res; x_index++){
         float dx = translation_low + x_index * CONFIG_dist_res;
         Vector2f trans_diff;
@@ -454,7 +455,8 @@ Pose2D<float> ParticleFilter::EstimateLidarOdometry(Pose2D<float> wheel_odometry
       }
     }
     // High resolution
-    double H = 0; 
+    double H = -1e10; 
+    // double H = 0; 
     int high_res_start_x_idx = (translation_low + best_x_index * CONFIG_low_dist_res) / (CONFIG_dist_res) - 1;
     int high_res_end_x_idx = (translation_low + (best_x_index + 1) * CONFIG_low_dist_res) / (CONFIG_dist_res) + 1;
     int high_res_start_y_idx = (translation_low + best_y_index * CONFIG_low_dist_res) / (CONFIG_dist_res) - 1;
@@ -488,9 +490,9 @@ Pose2D<float> ParticleFilter::EstimateLidarOdometry(Pose2D<float> wheel_odometry
           }
         }
         // H += pose_log_prob;
-        // std::cout << "dtheta, dx, dy, obs " << ((float) ((int) (1000*dtheta)))/1000 << ", " << ((float) ((int) (1000*dx)))/1000 << ", " << ((float) ((int) (1000*dy)))/1000 << ", ";
-        // std::cout << pose_log_prob << std::endl;
-        // ComputeCovariance(trans_diff + last_update_loc_, angle_diff + last_update_angle_, pose_log_prob);
+        // if(H > low_P) {
+        //   std::cout << "wrong\n";
+        // }
         // Update most likely transform
         if( H < pose_log_prob){
           H = pose_log_prob ;
@@ -623,12 +625,12 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
   if(!csm_map_initialized){
     csm_map_ = csm_map::CSMMap(CONFIG_map_length_dist, CONFIG_dist_res, CONFIG_min_map_prob, CONFIG_range_max, CONFIG_sigma_observation);
     debug_csm_map_ = csm_map::CSMMap(CONFIG_map_length_dist, CONFIG_dist_res, CONFIG_min_map_prob, CONFIG_range_max, CONFIG_sigma_observation);
-    low_csm_map_ = csm_map::CSMMap(CONFIG_map_length_dist, CONFIG_low_dist_res, CONFIG_min_map_prob, CONFIG_range_max, CONFIG_sigma_observation);
+    low_csm_map_ = low_csm_map::LowCSMMap(CONFIG_map_length_dist, CONFIG_low_dist_res, CONFIG_min_map_prob, CONFIG_range_max, CONFIG_sigma_observation);
     scan_cloud_ = vector<Vector2f>(ranges.size());
 
     ConvertScanToPointCloud(angle_min, angle_increment, ranges, scan_cloud_);
     csm_map_.GenerateMapFromNewScan(scan_cloud_);
-    low_csm_map_.GenerateMapFromNewScan(scan_cloud_);
+    low_csm_map_.GenerateMapFromHighRes(csm_map_, (int)(CONFIG_low_dist_res/CONFIG_dist_res));
     debug_csm_map_.GenerateMapFromNewScan(scan_cloud_);
 
 
@@ -717,7 +719,7 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
 
     // Update cost map with new cloud_
     csm_map_.GenerateMapFromNewScan(scan_cloud_);
-    low_csm_map_.GenerateMapFromNewScan(scan_cloud_);
+    low_csm_map_.GenerateMapFromHighRes(csm_map_, (int)(CONFIG_low_dist_res/CONFIG_dist_res));
     debug_csm_map_.GenerateMapFromNewScan(scan_cloud_);
     csm_map_.DrawCSMImage();
 

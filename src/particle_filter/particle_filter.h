@@ -31,6 +31,7 @@
 #include "visualization/visualization.h"
 
 #include "raster_map/csm_map.h"
+#include "raster_map/low_csm_map.h"
 #include "raster_map/transform_cube_slice.h"
 
 #ifndef SRC_PARTICLE_FILTER_H_
@@ -144,7 +145,7 @@ class ParticleFilter {
   
   csm_map::CSMMap csm_map_;
   csm_map::CSMMap debug_csm_map_;
-  csm_map::CSMMap low_csm_map_;
+  low_csm_map::LowCSMMap low_csm_map_;
   transform_cube_slice::TransformCubeSlice likelihood_cube_;
   bool csm_map_initialized = false;
   std::vector<Eigen::Vector2f> scan_cloud_;
