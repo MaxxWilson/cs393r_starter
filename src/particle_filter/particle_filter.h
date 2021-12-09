@@ -137,7 +137,7 @@ class ParticleFilter {
   Eigen::Vector2f BaseLinkToSensorFrame(const Eigen::Vector2f &loc, const float &angle);
 
   csm_map::CSMMap GetCSMMap();
-  low_csm_map::LowCSMMap GetLRCSMMap();
+  csm_map::CSMMap GetLRCSMMap();
 
  private:
   Eigen::Vector2f mean_odom_;
@@ -171,8 +171,7 @@ class ParticleFilter {
   // bool first_odom_flag = true;
   
   csm_map::CSMMap csm_map_;
-  csm_map::CSMMap debug_csm_map_;
-  low_csm_map::LowCSMMap low_csm_map_;
+  csm_map::CSMMap low_csm_map_;
   transform_cube_slice::TransformCubeSlice likelihood_cube_;
   transform_cube_slice::TransformCubeSlice low_res_likelihood_cube_;
   bool csm_map_initialized = false;

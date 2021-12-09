@@ -29,7 +29,7 @@ num_particles = 100 -- Increase until computation runs out
 resize_factor = 20          -- # num_points / resize_factor = num_rays
 
 sigma_observation = 0.1    -- Prof recommends 0.15-0.2 based on sensor specs
-gamma = 0.005 -- 0.01                -- TODO Experimental tuning
+gamma = 0.01 -- 0.01                -- TODO Experimental tuning
 
 -- Limits maximum weight error --
 -- Increasing these makes it harsher on short/long errors for scan
@@ -44,13 +44,13 @@ angle_update_thresh = 0.2 -- 15°
 
 -- CSM Search --
 
-low_dist_res = 0.15 -- 0.05 -- 50 cm
+low_dist_res = 0.1 -- 0.05 -- 50 cm
 
 dist_res = 0.03 -- 0.05 -- 50 cm
-theta_res = 0.01 -- 0.02 -- ~5°
+theta_res = 0.02 -- 0.02 -- ~5°
 csm_eval_range_max =  9.0
 
-theta_search_const = 5
+theta_search_const = 15
 dist_search_range = 0.5
 
 map_length_dist = dist_update_thresh + range_max + laser_offset + 4*sigma_observation + 0.5
