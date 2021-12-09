@@ -82,6 +82,8 @@ CONFIG_INT(row_num, "row_num");
 
 // CSM
 CONFIG_FLOAT(low_dist_res, "low_dist_res");
+CONFIG_FLOAT(low_theta_res, "low_theta_res");
+
 CONFIG_FLOAT(dist_res, "dist_res");
 CONFIG_FLOAT(theta_res, "theta_res");
 
@@ -356,9 +358,9 @@ Pose2D<float> ParticleFilter::EstimateLidarOdometry(Pose2D<float> wheel_odometry
     double P = -1e10;   // Log Probability of pose
     double debug_P = -1e10;   // For debug
     
-    std::vector<std::vector<std::vector<double>>> low_res_probs((int)((theta_high - theta_low) / CONFIG_theta_res) + 1, 
-                                                                std::vector<std::vector<double>>((int)((theta_high - theta_low) / CONFIG_theta_res) + 1, 
-                                                                std::vector<double>((int)((theta_high - theta_low) / CONFIG_theta_res) + 1)));
+    // std::vector<std::vector<std::vector<double>>> low_res_probs((int)((theta_high - theta_low) / CONFIG_theta_res) + 1, 
+    //                                                             std::vector<std::vector<double>>((int)((theta_high - theta_low) / CONFIG_theta_res) + 1, 
+    //                                                             std::vector<double>((int)((theta_high - theta_low) / CONFIG_theta_res) + 1)));
     Pose2D<float> low_T;
     Pose2D<float> T;
     Pose2D<float> debug_T;
@@ -409,7 +411,7 @@ Pose2D<float> ParticleFilter::EstimateLidarOdometry(Pose2D<float> wheel_odometry
           
           // Update most likely transform
 
-          low_res_probs[angle_index][x_index][y_index] = pose_log_prob;
+          // low_res_probs[angle_index][x_index][y_index] = pose_log_prob;
           if(low_P < pose_log_prob){
             low_T = Pose2D<float>(angle_diff, trans_diff);
             low_P = pose_log_prob ;
@@ -418,7 +420,7 @@ Pose2D<float> ParticleFilter::EstimateLidarOdometry(Pose2D<float> wheel_odometry
           }
           SearchRegion currRegion(angle_index, x_index, y_index, pose_log_prob);
           low_res_queue.push_back(currRegion);
-          std::cout << "Transform:(" << angle_diff << "," << trans_diff[0] << ", " << trans_diff[1] << ") " << pose_log_prob << "\n";
+          //std::cout << "Transform:(" << angle_diff << "," << trans_diff[0] << ", " << trans_diff[1] << ") " << pose_log_prob << "\n";
         }
       }     
       //std::cout << "low_T:(" << low_T.translation[0] << "," << low_T.translation[1] << ", " << low_T.angle << ") " << low_P << "\n";
@@ -533,10 +535,10 @@ Pose2D<float> ParticleFilter::EstimateLidarOdometry(Pose2D<float> wheel_odometry
       }
       else{
         // THIS IS WRONG I THINK - MAXX
-        int high_res_start_x_idx = (translation_low + currSearchRegion.x_index * CONFIG_low_dist_res) / (CONFIG_dist_res) - 1;
-        int high_res_end_x_idx = (translation_low + (currSearchRegion.x_index + 1) * CONFIG_low_dist_res) / (CONFIG_dist_res) + 1;
-        int high_res_start_y_idx = (translation_low + currSearchRegion.y_index * CONFIG_low_dist_res) / (CONFIG_dist_res) - 1;
-        int high_res_end_y_idx = (translation_low + (currSearchRegion.y_index + 1) * CONFIG_low_dist_res) / (CONFIG_dist_res) + 1;
+        int high_res_start_x_idx = (/*translation_low + */currSearchRegion.x_index * CONFIG_low_dist_res) / (CONFIG_dist_res) - 1;
+        int high_res_end_x_idx = (/*translation_low +*/ (currSearchRegion.x_index + 1) * CONFIG_low_dist_res) / (CONFIG_dist_res) + 1;
+        int high_res_start_y_idx = (/*translation_low +*/ currSearchRegion.y_index * CONFIG_low_dist_res) / (CONFIG_dist_res) - 1;
+        int high_res_end_y_idx = (/*translation_low +*/ (currSearchRegion.y_index + 1) * CONFIG_low_dist_res) / (CONFIG_dist_res) + 1;
         float dtheta = theta_low + currSearchRegion.theta_index * CONFIG_theta_res;
         // float angle_diff = csm_map_.RoundToResolution(wheel_odometry.angle + dtheta, CONFIG_theta_res);
         float angle_diff = wheel_odometry.angle + dtheta;
@@ -579,8 +581,12 @@ Pose2D<float> ParticleFilter::EstimateLidarOdometry(Pose2D<float> wheel_odometry
               H = pose_log_prob ;
               T = Pose2D<float>(angle_diff, trans_diff);
             }
+
+            std::cout << "Transform:(" << angle_diff << "," << trans_diff[0] << ", " << trans_diff[1] << ") " << pose_log_prob << "\n";
           }
         }
+
+        std::cout << std::endl<< std::endl<< std::endl<< std::endl;
       }
 
     }
@@ -758,7 +764,7 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
     ConvertScanToPointCloud(angle_min, angle_increment, ranges, scan_cloud_);
     csm_map_.GenerateMapFromNewScan(scan_cloud_);
     low_csm_map_.GenerateMapFromNewScan(scan_cloud_);
-    //low_csm_map_.GenerateMapFromHighRes(csm_map_, (int)(CONFIG_low_dist_res/CONFIG_dist_res));
+    // low_csm_map_.GenerateMapFromHighRes(csm_map_, (int)(CONFIG_low_dist_res/CONFIG_dist_res));
     debug_csm_map_.GenerateMapFromNewScan(scan_cloud_);
 
 
