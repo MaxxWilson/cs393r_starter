@@ -115,7 +115,7 @@ namespace low_csm_map{
         }
     }
 
-    void LowCSMMap::DrawScanCloudOnImage(const std::vector<Eigen::Vector2f> &cloud){
+    void LowCSMMap::DrawScanCloudOnImage(const std::vector<Eigen::Vector2f> &cloud, const double range_max){
         for(Eigen::Vector2f point: cloud){
             try{
                 if(point.norm() >= range_max) {
@@ -168,7 +168,7 @@ namespace low_csm_map{
     void LowCSMMap::GenerateMapFromHighRes(const csm_map::CSMMap& high_res_map, int res_ratio) {
         for(int x = 0; x < row_num; x++){
             for(int y = 0; y < row_num; y++){
-                prob_map[x][y] = -1e10;
+                prob_map[x][y] = init_grid_val;
                 for(int i = x * res_ratio; i <= (x + 1) * res_ratio; i++) {
                     for(int j = y * res_ratio; j <= (y + 1) * res_ratio; j++) {
                         try {
@@ -179,6 +179,7 @@ namespace low_csm_map{
                         }
                     }
                 }
+                max_likelihood = std::max(max_likelihood, prob_map[x][y]);
             }
         }
     }

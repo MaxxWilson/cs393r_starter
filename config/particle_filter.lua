@@ -44,14 +44,14 @@ angle_update_thresh = 0.2 -- 15°
 
 -- CSM Search --
 
-low_dist_res = 0.3 -- 0.05 -- 50 cm
+low_dist_res = 0.1 -- 0.05 -- 50 cm
 
 dist_res = 0.03 -- 0.05 -- 50 cm
 theta_res = 0.02 -- 0.02 -- ~5°
-csm_eval_range_max =  5.0
+csm_eval_range_max =  9.0
 
-theta_search_const = 10
-dist_search_const = 20
+theta_search_const = 5
+dist_search_range = 0.5
 
 map_length_dist = dist_update_thresh + range_max + laser_offset + 4*sigma_observation + 0.5
 row_num = 2*(map_length_dist)/dist_res + 1

@@ -108,7 +108,7 @@ class CSMMap : public xy_raster_map::XYRasterMap {
          * 
          * @param cloud vector of cartesian points
          */
-        void DrawScanCloudOnImage(const std::vector<Eigen::Vector2f> &cloud);
+        void DrawScanCloudOnImage(const std::vector<Eigen::Vector2f> &cloud, const double range_max);
 
     private:
         double range_max;

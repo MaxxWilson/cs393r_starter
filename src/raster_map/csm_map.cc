@@ -115,7 +115,7 @@ namespace csm_map{
         }
     }
 
-    void CSMMap::DrawScanCloudOnImage(const std::vector<Eigen::Vector2f> &cloud){
+    void CSMMap::DrawScanCloudOnImage(const std::vector<Eigen::Vector2f> &cloud, const double range_max){
         for(Eigen::Vector2f point: cloud){
             try{
                 if(point.norm() >= range_max) {

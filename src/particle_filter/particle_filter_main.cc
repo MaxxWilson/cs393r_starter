@@ -91,7 +91,9 @@ VisualizationMsg vis_msg_;
 sensor_msgs::LaserScan last_laser_msg_;
 
 ros::Publisher scan_image_publisher_;
+ros::Publisher low_res_scan_image_publisher_;
 ros::Publisher transform_cube_image_publisher_;
+ros::Publisher low_res_slice_image_publisher_;
 
 vector<Vector2f> trajectory_points_;
 
@@ -159,6 +161,10 @@ void PublishTFCubeImage(){
   cv::Mat image = particle_filter_.GetTFCubeImage();
   sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", image).toImageMsg();
   transform_cube_image_publisher_.publish(msg);
+
+  cv::Mat low_res_image = particle_filter_.GetLowResTFCubeImage();
+  sensor_msgs::ImagePtr low_res_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", low_res_image).toImageMsg();
+  low_res_slice_image_publisher_.publish(low_res_msg);
 }
 
 void PublishScanImage(){
@@ -166,6 +172,11 @@ void PublishScanImage(){
   cv::Mat image = particle_filter_.GetCSMMap().GetImage();
   sensor_msgs::ImagePtr msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", image).toImageMsg();
   scan_image_publisher_.publish(msg);
+
+  // rosrun rqt_image_view rqt_image_view image:="/scan_image"
+  cv::Mat lr_image = particle_filter_.GetLRCSMMap().GetImage();
+  sensor_msgs::ImagePtr lr_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", lr_image).toImageMsg();
+  low_res_scan_image_publisher_.publish(lr_msg);
 }
 
 void PublishVisualization() {
@@ -290,6 +301,10 @@ int main(int argc, char** argv) {
       n.advertise<sensor_msgs::Image>("scan_image", 1);
   transform_cube_image_publisher_ =
       n.advertise<sensor_msgs::Image>("tf_cube_image", 1);
+  low_res_slice_image_publisher_ =
+      n.advertise<sensor_msgs::Image>("low_res_slice_image", 1);
+  low_res_scan_image_publisher_ =
+      n.advertise<sensor_msgs::Image>("low_res_scan_image", 1);
 
   ProcessLive(&n);
 

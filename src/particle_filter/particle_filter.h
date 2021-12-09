@@ -47,6 +47,30 @@ struct Particle {
   double weight;
 };
 
+struct SearchRegion {
+  int theta_index;
+  int x_index;
+  int y_index;
+  double prob;
+  
+  SearchRegion(int theta_index, int x_index, int y_index, double prob):
+  theta_index(theta_index), x_index(x_index), y_index(y_index), prob(prob){ 
+  }
+  // bool operator==(const SearchRegion& other) const
+  // {
+  //   return (x_index == other.x_index && y_index == other.y_index && theta_index == other.theta_index);
+  // }
+};
+struct CompareProb {
+    bool operator()(struct SearchRegion const& p1, struct SearchRegion const& p2)
+    {
+        // return "true" if "p1" is ordered
+        // before "p2", for example:
+        return p1.prob < p2.prob;
+    }
+};
+
+
 class ParticleFilter {
  public:
   // Default Constructor.
@@ -108,10 +132,13 @@ class ParticleFilter {
 
   void SetParticlesForTesting(std::vector<Particle> new_particles);
   cv::Mat GetTFCubeImage();
+  cv::Mat GetLowResTFCubeImage();
 
   Eigen::Vector2f BaseLinkToSensorFrame(const Eigen::Vector2f &loc, const float &angle);
 
   csm_map::CSMMap GetCSMMap();
+  low_csm_map::LowCSMMap GetLRCSMMap();
+
  private:
   Eigen::Vector2f mean_odom_;
   float mean_angle_;
@@ -147,6 +174,7 @@ class ParticleFilter {
   csm_map::CSMMap debug_csm_map_;
   low_csm_map::LowCSMMap low_csm_map_;
   transform_cube_slice::TransformCubeSlice likelihood_cube_;
+  transform_cube_slice::TransformCubeSlice low_res_likelihood_cube_;
   bool csm_map_initialized = false;
   std::vector<Eigen::Vector2f> scan_cloud_;
 
