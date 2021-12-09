@@ -141,7 +141,7 @@ class ParticleFilter {
 
  private:
   Eigen::Vector2f mean_odom_;
-  float mean_angle_;
+  Eigen::Vector2f mean_angle_point_;
   Eigen::Matrix3f K_;
   float s_;
   void InitializeCovariance();
