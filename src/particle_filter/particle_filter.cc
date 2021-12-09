@@ -82,7 +82,7 @@ CONFIG_INT(row_num, "row_num");
 
 // CSM
 CONFIG_FLOAT(low_dist_res, "low_dist_res");
-CONFIG_FLOAT(low_theta_res, "low_theta_res");
+//CONFIG_FLOAT(low_theta_res, "low_theta_res");
 
 CONFIG_FLOAT(dist_res, "dist_res");
 CONFIG_FLOAT(theta_res, "theta_res");
@@ -582,7 +582,7 @@ Pose2D<float> ParticleFilter::EstimateLidarOdometry(Pose2D<float> wheel_odometry
               T = Pose2D<float>(angle_diff, trans_diff);
             }
 
-            std::cout << "Transform:(" << angle_diff << "," << trans_diff[0] << ", " << trans_diff[1] << ") " << pose_log_prob << "\n";
+            //std::cout << "Transform:(" << angle_diff << "," << trans_diff[0] << ", " << trans_diff[1] << ") " << pose_log_prob << "\n";
           }
         }
 
@@ -751,13 +751,13 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
                                   float angle_max,
                                   float angle_increment) {
 
-  Eigen::Vector2f test_trans(0.1, 0.05);
-  float angle = 0.1;
+  // Eigen::Vector2f test_trans(0.1, 0.05);
+  // float angle = 0.1;
 
   // Initialize cloud on first laser msg
   if(!csm_map_initialized){
     csm_map_ = csm_map::CSMMap(CONFIG_map_length_dist, CONFIG_dist_res, CONFIG_min_map_prob, CONFIG_range_max, CONFIG_sigma_observation);
-    debug_csm_map_ = csm_map::CSMMap(CONFIG_map_length_dist, CONFIG_dist_res, CONFIG_min_map_prob, CONFIG_range_max, CONFIG_sigma_observation);
+    //debug_csm_map_ = csm_map::CSMMap(CONFIG_map_length_dist, CONFIG_dist_res, CONFIG_min_map_prob, CONFIG_range_max, CONFIG_sigma_observation);
     low_csm_map_ = low_csm_map::LowCSMMap(CONFIG_map_length_dist, CONFIG_low_dist_res, CONFIG_min_map_prob, CONFIG_range_max, CONFIG_sigma_observation);
     scan_cloud_ = vector<Vector2f>(ranges.size());
 
@@ -765,32 +765,34 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
     csm_map_.GenerateMapFromNewScan(scan_cloud_);
     low_csm_map_.GenerateMapFromNewScan(scan_cloud_);
     // low_csm_map_.GenerateMapFromHighRes(csm_map_, (int)(CONFIG_low_dist_res/CONFIG_dist_res));
-    debug_csm_map_.GenerateMapFromNewScan(scan_cloud_);
+    //debug_csm_map_.GenerateMapFromNewScan(scan_cloud_);
 
 
     low_csm_map_.DrawCSMImage();
     csm_map_.DrawCSMImage();
     csm_map_initialized = true;
 
-    for(std::size_t i = 0; i < scan_cloud_.size(); i++){
-      scan_cloud_[i] = Eigen::Rotation2D<float>(-angle)*(scan_cloud_[i] - test_trans);
-    }
+    // for(std::size_t i = 0; i < scan_cloud_.size(); i++){
+    //   scan_cloud_[i] = Eigen::Rotation2D<float>(-angle)*(scan_cloud_[i] - test_trans);
+    // }
   }
 
   // Calculate motion since last update
   double odom_dist = (last_update_loc_ - prev_odom_loc_).norm();
   // COMMENT FOR SINGLE SCAN TEST
-  double delta_angle = angle + 0.0; //math_util::AngleDiff(prev_odom_angle_, last_update_angle_);
+  //double delta_angle = angle + 0.0;
+  double delta_angle = math_util::AngleDiff(prev_odom_angle_, last_update_angle_);
 
   // Update only if motion exceeds update threshold
-  if(odom_dist > CONFIG_min_update_dist || std::abs(delta_angle) > CONFIG_min_update_angle || true){
+  if(odom_dist > CONFIG_min_update_dist || std::abs(delta_angle) > CONFIG_min_update_angle){
     // static int i = 0;
     // double start_time = GetMonotonicTime();
 
     // Get Lidar Odometry from Correlative Scan Matching
     // COMMENTED FOR SINGLE SCAN TEST
     auto rot_to_last_pose = Eigen::Rotation2D<float>(-prev_odom_angle_).toRotationMatrix();
-    Vector2f odom_loc_diff = test_trans + Eigen::Vector2f(0.0, -0.0); // rot_to_last_pose*(prev_odom_loc_ - last_update_loc_);
+    //Vector2f odom_loc_diff = test_trans + Eigen::Vector2f(0.0, -0.0);
+    Vector2f odom_loc_diff = rot_to_last_pose*(prev_odom_loc_ - last_update_loc_);
 
 
     // Initialize Particle Filter Update variables
@@ -800,12 +802,14 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
     std::fill(weight_bins_.begin(), weight_bins_.end(), 0);
 
     // COMMENT FOR SINGLE SCAN TEST
-    //ConvertScanToPointCloud(angle_min, angle_increment, ranges, scan_cloud_);
+    ConvertScanToPointCloud(angle_min, angle_increment, ranges, scan_cloud_);
 
     // Estimate Lidar Odometry for new laser scan
     Pose2D<float> wheel_odom(delta_angle, odom_loc_diff);
+    double start = GetMonotonicTime();
     Pose2D<float> lidar_odom = EstimateLidarOdometry(wheel_odom); // cloud_, csm_map_
-
+    double end = GetMonotonicTime();
+    std::cout << "Exec Time: " << end - start << std::endl;
     std::cout << "Wheel Odometry: " << wheel_odom.translation.x() << ", " << wheel_odom.translation.y() << ", " << wheel_odom.angle << std::endl;
     std::cout << "Lidar Odometry: " << lidar_odom.translation.x() << ", " << lidar_odom.translation.y() << ", " << lidar_odom.angle << std::endl;
 
@@ -857,7 +861,8 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
 
     // Update cost map with new cloud_
     // COMMENT FOR SINGLE SCAN TEST
-    //csm_map_.GenerateMapFromNewScan(scan_cloud_);
+    csm_map_.GenerateMapFromNewScan(scan_cloud_);
+    low_csm_map_.GenerateMapFromNewScan(scan_cloud_);
     //low_csm_map_.GenerateMapFromHighRes(csm_map_, (int)(CONFIG_low_dist_res/CONFIG_dist_res));
     //debug_csm_map_.GenerateMapFromNewScan(scan_cloud_);
     csm_map_.DrawCSMImage();
@@ -868,7 +873,7 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
       //tf_scan[i] = Eigen::Rotation2D<float>(angle)*scan_cloud_[i] + test_trans;
     }
     
-    low_csm_map_.DrawScanCloudOnImage(tf_scan, CONFIG_csm_eval_range_max);
+    //low_csm_map_.DrawScanCloudOnImage(tf_scan, CONFIG_csm_eval_range_max);
     csm_map_.DrawScanCloudOnImage(tf_scan, CONFIG_csm_eval_range_max);
   }                     
 }
