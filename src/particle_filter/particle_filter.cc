@@ -19,25 +19,8 @@
 */
 //========================================================================
 
-#include <algorithm>
-#include <cmath>
-#include <iostream>
-#include "eigen3/Eigen/Dense"
-#include "eigen3/Eigen/Geometry"
-#include "gflags/gflags.h"
-#include "glog/logging.h"
-#include "shared/math/geometry.h"
-#include "shared/math/line2d.h"
-#include "shared/math/math_util.h"
-#include "shared/util/timer.h"
-#include "navigation/simple_queue.h"
-
 #include "config_reader/config_reader.h"
 #include "particle_filter.h"
-
-#include "vector_map/vector_map.h"
-
-#include <queue>
 
 using geometry::line2f;
 using std::cout;
@@ -51,11 +34,13 @@ using vector_map::VectorMap;
 
 namespace particle_filter {
 
+// Initial Parameters
 CONFIG_INT(num_particles, "num_particles");
 CONFIG_FLOAT(init_x_sigma, "init_x_sigma");
 CONFIG_FLOAT(init_y_sigma, "init_y_sigma");
 CONFIG_FLOAT(init_r_sigma, "init_r_sigma");
 
+// Motion Model Parameters
 CONFIG_FLOAT(k1, "k1");
 CONFIG_FLOAT(k2, "k2");
 CONFIG_FLOAT(k3, "k3");
@@ -63,38 +48,43 @@ CONFIG_FLOAT(k4, "k4");
 CONFIG_FLOAT(k5, "k5");
 CONFIG_FLOAT(k6, "k6");
 
+// LIDAR Geometry and Specs
 CONFIG_FLOAT(laser_offset, "laser_offset");
+CONFIG_DOUBLE(range_min, "range_min");
+CONFIG_DOUBLE(range_max, "range_max");
 
+// Minimum motion for particle filter update
 CONFIG_FLOAT(min_update_dist, "min_update_dist");
 CONFIG_FLOAT(min_update_angle, "min_update_angle");
 
+// Observation Likelihood Model Parameters
 CONFIG_DOUBLE(sigma_observation, "sigma_observation");
 CONFIG_DOUBLE(gamma, "gamma");
 CONFIG_DOUBLE(dist_short, "dist_short");
 CONFIG_DOUBLE(dist_long, "dist_long");
-CONFIG_DOUBLE(range_min, "range_min");
-CONFIG_DOUBLE(range_max, "range_max");
-
 CONFIG_DOUBLE(resize_factor, "resize_factor");
+
+// Resample Frequency
 CONFIG_INT(resample_frequency, "resample_frequency");
 
-CONFIG_INT(row_num, "row_num");
-
-// CSM
+// CSM Lookup Table Parameters
 CONFIG_FLOAT(low_dist_res, "low_dist_res");
+CONFIG_FLOAT(low_theta_res, "low_theta_res");
 
 CONFIG_FLOAT(dist_res, "dist_res");
 CONFIG_FLOAT(theta_res, "theta_res");
 
-CONFIG_FLOAT(theta_search_const, "theta_search_const");
+CONFIG_FLOAT(theta_search_range, "theta_search_range");
 CONFIG_FLOAT(dist_search_range, "dist_search_range");
+
+CONFIG_DOUBLE(csm_sigma_observation, "csm_sigma_observation");
+CONFIG_DOUBLE(csm_gamma, "csm_gamma");
 
 CONFIG_DOUBLE(map_length_dist, "map_length_dist");
 CONFIG_DOUBLE(min_map_prob, "min_map_prob");
 CONFIG_DOUBLE(csm_eval_range_max, "csm_eval_range_max");
 
-  Vector2f first_odom_loc;
-  float first_odom_angle;
+CONFIG_STRING(localization_mode, "localization_mode");
 
 config_reader::ConfigReader config_reader_({"config/particle_filter.lua"});
 
@@ -103,8 +93,37 @@ ParticleFilter::ParticleFilter() :
     prev_odom_angle_(0),
     odom_initialized_(false) {}
 
+
 void ParticleFilter::GetParticles(vector<Particle>* particles) const {
   *particles = particles_;
+}
+
+cv::Mat ParticleFilter::GetTFCubeImage(){
+  return likelihood_cube_.GetImage();
+}
+
+cv::Mat ParticleFilter::GetLowResTFCubeImage(){
+  return low_res_likelihood_cube_.GetImage();
+}
+
+Eigen::Vector2f ParticleFilter::BaseLinkToSensorFrame(const Eigen::Vector2f &loc, const float &angle){
+  return loc + Vector2f(CONFIG_laser_offset*cos(angle), CONFIG_laser_offset*sin(angle));
+}
+
+csm_map::CSMMap ParticleFilter::GetCSMMap(){
+  return csm_map_;
+}
+
+csm_map::CSMMap ParticleFilter::GetLRCSMMap(){
+  return low_csm_map_;
+}
+
+bool ParticleFilter::horizontal_line_compare(const geometry::line2f l1, const geometry::line2f l2){
+  return l1.p0.y() < l2.p0.y();
+}
+
+bool ParticleFilter::vertical_line_compare(const geometry::line2f l1, const geometry::line2f l2){
+  return l1.p0.x() < l2.p0.x();
 }
 
 void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
@@ -119,10 +138,14 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
   // Compute what the predicted point cloud would be, if the car was at the pose
   // loc, angle, with the sensor characteristics defined by the provided
   // parameters.
+
+  // Skip a set ratio of laser scans in evaluating LIDAR readings
   scan.resize((int)(num_ranges / CONFIG_resize_factor));
   
+  // Get sensor location in world frame
   Vector2f sensor_loc = BaseLinkToSensorFrame(loc, angle);
   
+  // Locate robot within horizontal and vertical grid formed from map lines
   int v_start_index = std::lower_bound(horizontal_lines_.begin(), horizontal_lines_.end(), line2f(sensor_loc, sensor_loc), horizontal_line_compare) - horizontal_lines_.begin();
   int h_start_index = std::lower_bound(vertical_lines_.begin(), vertical_lines_.end(), line2f(sensor_loc, sensor_loc), vertical_line_compare) - vertical_lines_.begin();
 
@@ -131,8 +154,8 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
     return;
   }
 
-  // Fill in the entries of scan using array writes, e.g. scan[i] = ...
-  for (size_t i = 0; i < scan.size(); ++i) { // for each ray
+  // for each ray
+  for (size_t i = 0; i < scan.size(); ++i){
     // Initialize the ray line
     float ray_angle = angle + angle_min + CONFIG_resize_factor * i / num_ranges * (angle_max - angle_min);
     float C0 = cos(ray_angle);
@@ -141,6 +164,7 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
     Vector2f final_intersection = sensor_loc + CONFIG_range_max * Vector2f(C0, S0);
     line2f ray(sensor_loc, final_intersection);
 
+    // Determine horizontal and vertical search directions
     int h_dir = math_util::Sign(ray.Dir().x());
     int v_dir = math_util::Sign(ray.Dir().y());
 
@@ -155,6 +179,7 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
       v_search_index += 1;
     }
 
+    // Search through ordered map lines, from robot location in direction of ray, until a collision is found or max range met
     Vector2f final_intersection_xy = final_intersection;
     bool intersection_found = false;
     double curr_dist = 0;
@@ -181,6 +206,7 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
         }
     }
 
+    // Search any angled lines (unsortable) in the map directly for this ray
     float curr_dist_angled = range_max;
     Vector2f final_intersection_angled = final_intersection;
     for (size_t i = 0; i < angled_lines_.size(); ++i) {
@@ -192,6 +218,7 @@ void ParticleFilter::GetPredictedPointCloud(const Vector2f& loc,
       }     
     }
 
+    // Select the closest collision point
     if((final_intersection_angled - ray.p0).norm() < (final_intersection - ray.p0).norm()){
       final_intersection = final_intersection_angled;
     }
@@ -219,12 +246,121 @@ double GetRobustObservationLikelihood(double measured, double expected, double d
   }
 }
 
-cv::Mat ParticleFilter::GetTFCubeImage(){
-  return likelihood_cube_.GetImage();
+void ParticleFilter::Predict(const Eigen::Vector2f& odom_loc, const float odom_angle) {
+  // A new odometry value is available (in the odom frame)
+  // propagate particles forward based on odometry.
+
+  // // rotation matrix from last odom to last baselink
+  // auto rot_odom1_to_bl1 = Eigen::Rotation2D<float>(-prev_odom_angle_).toRotationMatrix();
+  
+  // // Change in translation and angle from odometry
+  // Eigen::Vector2f delta_translation = rot_odom1_to_bl1 * (odom_loc - prev_odom_loc_);
+  // float delta_angle = math_util::AngleDiff(odom_angle, prev_odom_angle_);
+
+  // // Get noisy angle
+  float sigma_tht = CONFIG_k5 * estimated_odom_.pose.translation.norm() + CONFIG_k6 * abs(estimated_odom_.pose.angle);
+  float noisy_angle = estimated_odom_.pose.angle + rng_.Gaussian(0.0, estimated_odom_.covariance(2,2));
+
+  // // Get translation noise in Base Link 2
+  // float sigma_x = CONFIG_k1 * delta_translation.norm() + CONFIG_k2 * abs(delta_angle);
+  // float sigma_y = CONFIG_k3 * delta_translation.norm() + CONFIG_k4 * abs(delta_angle);
+
+  for(Particle &particle: particles_){
+
+    Eigen::Vector2f e_xy = Eigen::Vector2f((float) rng_.Gaussian(0.0, estimated_odom_.covariance(0,0)),(float) rng_.Gaussian(0.0, estimated_odom_.covariance(1,1)));
+
+    // Transform noise to Base Link 1 using estimated angle to get noisy translation
+    auto rot_b2_to_b1 = Eigen::Rotation2D<float>(estimated_odom_.pose.angle).toRotationMatrix();
+    Eigen::Vector2f noisy_translation = estimated_odom_.pose.translation + rot_b2_to_b1 * e_xy; // in previous base_link
+    
+    // Transform noise to map using current particle angle
+    auto rot_bl1_to_map = Eigen::Rotation2D<float>(particle.angle).toRotationMatrix();
+    particle.loc += rot_bl1_to_map * noisy_translation;   
+    particle.angle += noisy_angle;        
+  }
+
+  // Update previous odometry
+  prev_odom_loc_ = odom_loc;
+  prev_odom_angle_ = odom_angle;
+
+  // double d_translation = (last_update_loc_ - prev_odom_loc_).norm();
+  // double d_angle = math_util::AngleDiff(last_update_angle_, prev_odom_angle_);
+
+  // std::cout << "Motion Model: " << d_translation << ", " << d_angle << std::endl;
 }
 
-cv::Mat ParticleFilter::GetLowResTFCubeImage(){
-  return low_res_likelihood_cube_.GetImage();
+/**
+ * @brief Predicts EKF distribution when there is new Odometry data 
+ * 
+ * @param odom_loc 
+ * @param odom_angle 
+ */
+void ParticleFilter::PredictEKF(const Eigen::Vector2f& odom_loc, const float odom_angle){
+
+  if(!odom_initialized_){
+    prev_odom_loc_ = odom_loc;
+    prev_odom_angle_ = odom_angle;
+    odom_initialized_ = true;
+    return;
+  }
+
+  // rotation matrix from last odom to last baselink
+  auto rot_odom1_to_bl1 = Eigen::Rotation2D<float>(-prev_odom_angle_).toRotationMatrix();
+  
+  // Change in translation and angle from odometry
+  Eigen::Vector2f delta_translation = rot_odom1_to_bl1 * (odom_loc - prev_odom_loc_);
+  float delta_angle = math_util::AngleDiff(odom_angle, prev_odom_angle_);
+
+  // Get translation noise in Base Link 2
+  float sigma_x = CONFIG_k1 * delta_translation.norm() + CONFIG_k2 * abs(delta_angle);
+  float sigma_y = CONFIG_k3 * delta_translation.norm() + CONFIG_k4 * abs(delta_angle);
+  float sigma_tht = CONFIG_k5 * delta_translation.norm() + CONFIG_k6 * abs(delta_angle);
+
+  //sigma_x, sigma_y, sigma_tht are calculated similar to PF Predict function
+  Q <<    math_util::Pow(sigma_x, 2),                          0,                            0,
+          0                         , math_util::Pow(sigma_y, 2),                            0,
+          0                         ,                          0, math_util::Pow(sigma_tht, 2);
+
+  wheel_odom_.pose.ApplyPose(Pose2D<float>(delta_angle, delta_translation));
+  wheel_odom_.covariance += Q;
+
+  if(std::strcmp(CONFIG_localization_mode.c_str(), "odom") == 0){
+    // Update odometry estimate
+    estimated_odom_.pose = wheel_odom_.pose;
+    estimated_odom_.covariance = wheel_odom_.covariance;
+  }
+
+  // std::cout << "Odometry: " << delta_translation.x() << ", " << delta_translation.y() << ", " << delta_angle << std::endl;
+  // std::cout << "wheel_odom_: " << wheel_odom_.pose.translation.x() << ", " << wheel_odom_.pose.translation.y() << ", " << wheel_odom_.pose.angle << std::endl;
+
+  // Update last odom
+  prev_odom_loc_ = odom_loc;
+  prev_odom_angle_ = odom_angle;
+}
+
+/**
+ * @brief Updates EKF distribution when there is new LIDAR/Odometry data 
+ * Distribution generated is of transforms from previous location to next predicted location
+ * Particles in PF then sample transforms from combined EKF and PF motion model distributions
+ * Odometry and Lidar distrbutions are fused during has_new_lidar block
+ */
+void ParticleFilter::UpdateEKF(){
+  std::cout << "EKF Update" << std::endl;
+  //Kalman Gain K - wheel_odom_.covariance = Q, lidar_odom_.covariance = R
+  //K = Q * (Q+R)^-1
+  Eigen::Matrix3f K = wheel_odom_.covariance * (wheel_odom_.covariance + lidar_odom_.covariance).inverse();
+
+  //New mean of combined Predicted state and Sensor state distributions
+  //mean_state is mean of predicted distribution uq is mean of sensor distribution
+  //ut = uq + K * (ur -uq)
+  Eigen::Vector3f ut = wheel_odom_.GetStateVector() + K * (lidar_odom_.GetStateVector() - wheel_odom_.GetStateVector());
+  std::cout << "Lidar State: " << std::endl << lidar_odom_.GetStateVector() << std::endl;
+  
+  std::cout << "Fused State: " << std::endl << ut << std::endl;
+  estimated_odom_.SetStateVector(ut);
+  //New COV of combined Predicted state and Sensor state distributions
+  //COVt = Q - K * Q
+  estimated_odom_.covariance =  lidar_odom_.covariance - K * lidar_odom_.covariance;
 }
 
 // Update the weight of the particle based on how well it fits the observation
@@ -247,18 +383,24 @@ void ParticleFilter::Update(const vector<float>& ranges,
                          angle_min,
                          angle_max,
                          &predicted_cloud);
-  Vector2f sensor_loc = BaseLinkToSensorFrame(particle.loc, particle.angle);
-  // resize the ranges
-  vector<float> trimmed_ranges(predicted_cloud.size());
-  particle.weight = 0;
 
-  // Calculate the particle weight
+  // Get sensor location in global frame
+  Vector2f sensor_loc = BaseLinkToSensorFrame(particle.loc, particle.angle);
+  
+  // resize the laser scan ranges
+  vector<float> trimmed_ranges(predicted_cloud.size());
+  
+  // Calculate the particle weight in log likelihood
+  particle.weight = 0;
   for(std::size_t i = 0; i < predicted_cloud.size(); i++) {
     trimmed_ranges[i] = ranges[i * CONFIG_resize_factor];
     double predicted_range = (predicted_cloud[i] - sensor_loc).norm();
     double diff = GetRobustObservationLikelihood(trimmed_ranges[i], predicted_range, CONFIG_dist_short, CONFIG_dist_long);
     particle.weight += -CONFIG_gamma * Sq(diff) / Sq(CONFIG_sigma_observation);
   } 
+
+  //clearing odometry data
+  wheel_odom_ = PoseWithCovariance();
 }
 
 void ParticleFilter::Resample() {
@@ -293,7 +435,7 @@ void ParticleFilter::LowVarianceResample() {
     int new_particle_index = std::lower_bound(weight_bins_.begin(), weight_bins_.end(), select_weight) - weight_bins_.begin();
     select_weight = std::fmod(select_weight + weight_sum_/((double) particles_.size()), weight_sum_);
     new_particles[i] = particles_[new_particle_index];
-    new_particles[i].weight = 1/((double) particles_.size()); // rng_.UniformRandom(); good for testing
+    new_particles[i].weight = 1/((double) particles_.size());
   }
   weight_sum_ = 1.0;
   
@@ -331,7 +473,6 @@ void ParticleFilter::ComputeCovariance(Eigen::Vector2f odom, float angle, float 
   xi << odom.x(), odom.y(), angle;
   K_ += xi * xi.transpose() * prob;
   s_ += prob;
-
 }
 
 Eigen::Matrix3f ParticleFilter::ComputeCovariance() {
@@ -342,9 +483,9 @@ Eigen::Matrix3f ParticleFilter::ComputeCovariance() {
   return res;
 }
 
-Pose2D<float> ParticleFilter::EstimateLidarOdometry(Pose2D<float> wheel_odometry){
-    float theta_low = -CONFIG_theta_search_const*CONFIG_theta_res;
-    float theta_high = CONFIG_theta_search_const*CONFIG_theta_res;
+void ParticleFilter::EstimateLidarOdometry(){
+    float theta_low = -CONFIG_theta_search_range;
+    float theta_high = CONFIG_theta_search_range;
     float translation_low = -CONFIG_dist_search_range;
     float translation_high = CONFIG_dist_search_range;
 
@@ -352,33 +493,31 @@ Pose2D<float> ParticleFilter::EstimateLidarOdometry(Pose2D<float> wheel_odometry
     likelihood_cube_ = transform_cube_slice::TransformCubeSlice((2*CONFIG_dist_res + 2*CONFIG_dist_search_range)/2, CONFIG_dist_res, -1e5);
 
     auto low_res_queue = std::vector<SearchRegion>();
-
-    double low_P = -1e10;   // Log Probability of pose
     
-    // std::vector<std::vector<std::vector<double>>> low_res_probs((int)((theta_high - theta_low) / CONFIG_theta_res) + 1, 
-    //                                                             std::vector<std::vector<double>>((int)((theta_high - theta_low) / CONFIG_theta_res) + 1, 
-    //                                                             std::vector<double>((int)((theta_high - theta_low) / CONFIG_theta_res) + 1)));
+    double low_P = -1e10;   // Log Probability of pose
     Pose2D<float> low_T;
     Pose2D<float> T;
+
+    Eigen::Matrix3f covariance;
+
     InitializeCovariance();
+
     // For each change in theta
-    for(int angle_index = 0; angle_index <= (theta_high - theta_low) / CONFIG_theta_res; angle_index++){
-      float dtheta = theta_low + angle_index * CONFIG_theta_res;
-      // float angle_diff = csm_map_.RoundToResolution(wheel_odometry.angle + dtheta, CONFIG_theta_res);
-      float angle_diff = wheel_odometry.angle + dtheta;
-      // Low Resolution
+    for(int angle_index = 0; angle_index <= (theta_high - theta_low) / CONFIG_low_theta_res; angle_index++){
+      float dtheta = theta_low + angle_index * CONFIG_low_theta_res;
+      float angle_diff = xy_raster_map::XYRasterMap::RoundToResolution(wheel_odom_.pose.angle + dtheta, CONFIG_low_theta_res);
       
+      // Low Resolution
       for(int x_index = 0; x_index <= (translation_high - translation_low) / CONFIG_low_dist_res; x_index++){
         float dx = translation_low + x_index * CONFIG_low_dist_res;
         Vector2f trans_diff;
-        // trans_diff[0] = low_csm_map_.RoundToResolution(wheel_odometry.translation.x() + dx, CONFIG_low_dist_res);
-        trans_diff[0] = wheel_odometry.translation.x() + dx;
+        trans_diff[0] = xy_raster_map::XYRasterMap::RoundToResolution(wheel_odom_.pose.translation.x() + dx, CONFIG_low_dist_res);
         // For each possible Y
         for(int y_index = 0; y_index <= (translation_high - translation_low) / CONFIG_low_dist_res; y_index++){
           float dy = translation_low + y_index * CONFIG_low_dist_res;
+          trans_diff[1] = xy_raster_map::XYRasterMap::RoundToResolution(wheel_odom_.pose.translation.y() + dy, CONFIG_low_dist_res);
+
           double pose_log_prob = 0.0;
-          //trans_diff[1] = low_csm_map_.RoundToResolution(wheel_odometry.translation.y() + dy, CONFIG_low_dist_res);
-          trans_diff[1] = wheel_odometry.translation.y() + dy;
 
           // For each point in scan
           for(std::size_t i = 0; i < scan_cloud_.size(); i++){
@@ -387,163 +526,167 @@ Pose2D<float> ParticleFilter::EstimateLidarOdometry(Pose2D<float> wheel_odometry
             Vector2f scanPos = Eigen::Rotation2Df(angle_diff) * scan_cloud_[i] + trans_diff;
     
             // Ignore scans that don't hit an object
-            if(scanPos.norm() >= CONFIG_csm_eval_range_max) {
+            if(scanPos.norm() >= std::min(CONFIG_csm_eval_range_max, csm_map_.GetMaxRangeInScan())) {
               continue;
             }
 
             try{
+              // Get log likelihood from correlative scan matching image
               double gaussian_prob = low_csm_map_.GetLogLikelihoodAtPosition(scanPos.x(), scanPos.y());
-              pose_log_prob += CONFIG_gamma*gaussian_prob;
+              pose_log_prob += CONFIG_csm_gamma*gaussian_prob;
               
             } catch(std::out_of_range) {
               continue;
             }
           }
 
-          // std::cout << "low Resolution: dtheta, dx, dy, obs " << ((float) ((int) (1000*dtheta)))/1000 << ", " << ((float) ((int) (1000*dx)))/1000 << ", " << ((float) ((int) (1000*dy)))/1000 << ", ";
-          // std::cout << pose_log_prob << std::endl;
           
           // Update most likely transform
-
-          // low_res_probs[angle_index][x_index][y_index] = pose_log_prob;
           if(low_P < pose_log_prob){
             low_T = Pose2D<float>(angle_diff, trans_diff);
             low_P = pose_log_prob;
           }
+          //std::cout << angle_diff << ", " << trans_diff.x() << ", " << trans_diff.y() << ", " << pose_log_prob << std::endl;
+          // Add new search region to queue
           SearchRegion currRegion(angle_index, x_index, y_index, pose_log_prob);
           low_res_queue.push_back(currRegion);
-          //std::cout << "Transform:(" << angle_diff << "," << trans_diff[0] << ", " << trans_diff[1] << ") " << pose_log_prob << "\n";
         }
       }     
     }
 
+    std::cout << std::endl;
+
+    // Sort search regions by probability, where most likely regions will be evaluated with high-res map first
     std::sort(low_res_queue.begin(), low_res_queue.end(), CompareProb());
 
     double Li = 1;
     double H = CONFIG_min_map_prob;
     while(!low_res_queue.empty()){
+      //std::cout << "Region Dump" << std::endl;
+      
       SearchRegion currSearchRegion = low_res_queue.back();
       low_res_queue.pop_back();
       
       Li = currSearchRegion.prob;
 
+      // Low resolution raster provides upper bound on max probability in a region
+      // Search regions with the high res map until the high res likelihood is larger than all remaining search regions
       if(Li < H){
         break;
       }
       else{
-        int high_res_start_x_idx = (currSearchRegion.x_index * CONFIG_low_dist_res) / (CONFIG_dist_res) - 1;
-        int high_res_end_x_idx = ((currSearchRegion.x_index + 1) * CONFIG_low_dist_res) / (CONFIG_dist_res) + 1;
-        int high_res_start_y_idx = (currSearchRegion.y_index * CONFIG_low_dist_res) / (CONFIG_dist_res) - 1;
-        int high_res_end_y_idx = ((currSearchRegion.y_index + 1) * CONFIG_low_dist_res) / (CONFIG_dist_res) + 1;
-        float dtheta = theta_low + currSearchRegion.theta_index * CONFIG_theta_res;
-        // float angle_diff = csm_map_.RoundToResolution(wheel_odometry.angle + dtheta, CONFIG_theta_res);
-        float angle_diff = wheel_odometry.angle + dtheta;
-        for(int x_index = high_res_start_x_idx; x_index <= high_res_end_x_idx; x_index++){
-          float dx = translation_low + x_index * CONFIG_dist_res;
-          Vector2f trans_diff;
-          // trans_diff[0] = csm_map_.RoundToResolution(wheel_odometry.translation.x() + dx, CONFIG_dist_res);
-          trans_diff[0] = wheel_odometry.translation.x() + dx;
+        int high_res_start_theta_idx = (currSearchRegion.theta_index * CONFIG_low_theta_res - 0.5*CONFIG_low_theta_res) / (CONFIG_theta_res) - 1;
+        int high_res_end_theta_idx = ((currSearchRegion.theta_index + 1) * CONFIG_low_theta_res + 0.5*CONFIG_low_theta_res) / (CONFIG_theta_res) + 1;
+        int high_res_start_x_idx = (currSearchRegion.x_index * CONFIG_low_dist_res - 0.5*CONFIG_low_dist_res) / (CONFIG_dist_res) - 1;
+        int high_res_end_x_idx = ((currSearchRegion.x_index + 1) * CONFIG_low_dist_res + 0.5*CONFIG_low_dist_res) / (CONFIG_dist_res) + 1;
+        int high_res_start_y_idx = (currSearchRegion.y_index * CONFIG_low_dist_res - 0.5*CONFIG_low_dist_res) / (CONFIG_dist_res) - 1;
+        int high_res_end_y_idx = ((currSearchRegion.y_index + 1) * CONFIG_low_dist_res + 0.5*CONFIG_low_dist_res) / (CONFIG_dist_res) + 1;
+        
+        for(int theta_index = high_res_start_theta_idx; theta_index <= high_res_end_theta_idx; theta_index++){
+          float dtheta = theta_low + theta_index * CONFIG_theta_res;
+          float angle_diff = xy_raster_map::XYRasterMap::RoundToResolution(wheel_odom_.pose.angle + dtheta, CONFIG_theta_res);
+          for(int x_index = high_res_start_x_idx; x_index <= high_res_end_x_idx; x_index++){
+            float dx = translation_low + x_index * CONFIG_dist_res;
+            Vector2f trans_diff;
+            trans_diff[0] = xy_raster_map::XYRasterMap::RoundToResolution(wheel_odom_.pose.translation.x() + dx, CONFIG_dist_res);
 
-          for(int y_index = high_res_start_y_idx; y_index <= high_res_end_y_idx; y_index++){
-            float dy = translation_low + y_index * CONFIG_dist_res;
-            double pose_log_prob = 0.0;
-            // trans_diff[1] = csm_map_.RoundToResolution(wheel_odometry.translation.y() + dy, CONFIG_dist_res);
-            trans_diff[1] = wheel_odometry.translation.y() + dy;
-            // For each point in scan
-            for(std::size_t i = 0; i < scan_cloud_.size(); i++){
+            for(int y_index = high_res_start_y_idx; y_index <= high_res_end_y_idx; y_index++){
+              float dy = translation_low + y_index * CONFIG_dist_res;
+              trans_diff[1] = xy_raster_map::XYRasterMap::RoundToResolution(wheel_odom_.pose.translation.y() + dy, CONFIG_dist_res);
+              
+              double pose_log_prob = 0.0;
+              
+              // For each point in scan
+              for(std::size_t i = 0; i < scan_cloud_.size(); i++){
 
-              // Transform new point into frame of previous scan / reference image
-              Vector2f scanPos = Eigen::Rotation2Df(angle_diff) * scan_cloud_[i] + trans_diff;
+                // Transform new point into frame of previous scan / reference image
+                Vector2f scanPos = Eigen::Rotation2Df(angle_diff) * scan_cloud_[i] + trans_diff;
 
-              // Ignore scans that don't hit an object
-              if(scanPos.norm() >= CONFIG_csm_eval_range_max) {
-                continue;
+                // Ignore scans that don't hit an object
+                if(scanPos.norm() >= std::min(CONFIG_csm_eval_range_max, csm_map_.GetMaxRangeInScan())) {
+                  continue;
+                }
+
+                try{
+                  // Get log likelihood from correlative scan matching image
+                  double gaussian_prob = csm_map_.GetLogLikelihoodAtPosition(scanPos.x(), scanPos.y());
+                  pose_log_prob += CONFIG_csm_gamma*gaussian_prob;
+
+                } catch(std::out_of_range) {
+                  continue;
+                }
               }
 
-              try{
-                double gaussian_prob = csm_map_.GetLogLikelihoodAtPosition(scanPos.x(), scanPos.y());
-                pose_log_prob += CONFIG_gamma*gaussian_prob;
-
-              } catch(std::out_of_range) {
-                continue;
+              ComputeCovariance(trans_diff, angle_diff, pose_log_prob);
+              
+              // Update most likely transform
+              if( H < pose_log_prob){
+                H = pose_log_prob ;
+                T = Pose2D<float>(angle_diff, trans_diff);
               }
-            }
 
-            // std::cout << "dtheta, dx, dy, obs " << ((float) ((int) (1000*dtheta)))/1000 << ", " << ((float) ((int) (1000*dx)))/1000 << ", " << ((float) ((int) (1000*dy)))/1000 << ", ";
-            // std::cout << pose_log_prob << std::endl;
-            ComputeCovariance(trans_diff, angle_diff, pose_log_prob);
-            // Update most likely transform
-            if( H < pose_log_prob){
-              H = pose_log_prob ;
-              T = Pose2D<float>(angle_diff, trans_diff);
+              //std::cout << angle_diff << ", " << trans_diff.x() << ", " << trans_diff.y() << ", " << pose_log_prob << std::endl;
             }
-
-            //std::cout << "Transform:(" << angle_diff << "," << trans_diff[0] << ", " << trans_diff[1] << ") " << pose_log_prob << "\n";
           }
         }
-
-        std::cout << std::endl<< std::endl<< std::endl<< std::endl;
       }
-
     }
-    Eigen::Matrix3f covariance = ComputeCovariance();
+    covariance = ComputeCovariance();
     std::cout << std::endl << covariance << std::endl << std::endl;
     
-    // Produces Image for most likely theta
-    float lr_angle_diff = low_T.angle;
-    // float angle_diff = low_T.angle;
-    // For each possible X
-    for(int x_index = 0; x_index <= (translation_high - translation_low) / CONFIG_low_dist_res; x_index++){
-      float dx = translation_low + x_index * CONFIG_low_dist_res;
-      Vector2f trans_diff;
-      trans_diff[0] = low_csm_map_.RoundToResolution(wheel_odometry.translation.x() + dx, CONFIG_low_dist_res);
+    // // Produces Image for most likely theta
+    // float lr_angle_diff = low_T.angle;
+    // // For each possible X
+    // for(int x_index = 0; x_index <= (translation_high - translation_low) / CONFIG_low_dist_res; x_index++){
+    //   float dx = translation_low + x_index * CONFIG_low_dist_res;
+    //   Vector2f trans_diff;
+    //   trans_diff[0] = xy_raster_map::XYRasterMap::RoundToResolution(wheel_odom_.pose.translation.x() + dx, CONFIG_dist_res);
       
-      // For each possible Y
-      for(int y_index = 0; y_index <= (translation_high - translation_low) / CONFIG_low_dist_res; y_index++){
-        float dy = translation_low + y_index * CONFIG_low_dist_res;
-        double pose_log_prob = 0.0;
-        trans_diff[1] = low_csm_map_.RoundToResolution(wheel_odometry.translation.y() + dy, CONFIG_low_dist_res);
+    //   // For each possible Y
+    //   for(int y_index = 0; y_index <= (translation_high - translation_low) / CONFIG_low_dist_res; y_index++){
+    //     float dy = translation_low + y_index * CONFIG_low_dist_res;
+    //     trans_diff[1] = xy_raster_map::XYRasterMap::RoundToResolution(wheel_odom_.pose.translation.y() + dy, CONFIG_dist_res);
         
-        // For each point in scan
-        for(std::size_t i = 0; i < scan_cloud_.size(); i++){
+    //     double pose_log_prob = 0.0;
 
-          // Transform new point into frame of previous scan / reference image
-          Vector2f scanPos = Eigen::Rotation2Df(lr_angle_diff) * scan_cloud_[i] + trans_diff;
+    //     // For each point in scan
+    //     for(std::size_t i = 0; i < scan_cloud_.size(); i++){
+
+    //       // Transform new point into frame of previous scan / reference image
+    //       Vector2f scanPos = Eigen::Rotation2Df(lr_angle_diff) * scan_cloud_[i] + trans_diff;
   
-          // Ignore scans that don't hit an object
-          if(scanPos.norm() >= CONFIG_csm_eval_range_max) {
-            continue;
-          }
+    //       // Ignore scans that don't hit an object
+    //       if(scanPos.norm() >= std::min(CONFIG_csm_eval_range_max, csm_map_.GetMaxRangeInScan())) {
+    //         continue;
+    //       }
 
-          try{
-            double gaussian_prob = low_csm_map_.GetLogLikelihoodAtPosition(scanPos.x(), scanPos.y());
-            pose_log_prob += CONFIG_gamma*gaussian_prob;
-          } catch(std::out_of_range) {
-            continue;
-          }
-        }
-
-        low_res_likelihood_cube_.SetTransformLikelihood(dx, dy, pose_log_prob);
-      }
-    }
-
-    low_res_likelihood_cube_.DrawCSMImage();
+    //       try{
+    //         // Get log likelihood from correlative scan matching image
+    //         double gaussian_prob = low_csm_map_.GetLogLikelihoodAtPosition(scanPos.x(), scanPos.y());
+    //         pose_log_prob += CONFIG_csm_gamma*gaussian_prob;
+    //       } catch(std::out_of_range) {
+    //         continue;
+    //       }
+    //     }
+    //     low_res_likelihood_cube_.SetTransformLikelihood(dx, dy, pose_log_prob);
+    //   }
+    // }
+    // low_res_likelihood_cube_.DrawCSMImage();
 
     
     // Produces Image for most likely theta
-    // float angle_diff = T.angle;
     float angle_diff = T.angle;
     // For each possible X
     for(int x_index = 0; x_index <= (translation_high - translation_low) / CONFIG_dist_res; x_index++){
       float dx = translation_low + x_index * CONFIG_dist_res;
       Vector2f trans_diff;
-      trans_diff[0] = csm_map_.RoundToResolution(wheel_odometry.translation.x() + dx, CONFIG_dist_res);
+      trans_diff[0] = csm_map_.RoundToResolution(wheel_odom_.pose.translation.x() + dx, CONFIG_dist_res);
       
       // For each possible Y
       for(int y_index = 0; y_index <= (translation_high - translation_low) / CONFIG_dist_res; y_index++){
         float dy = translation_low + y_index * CONFIG_dist_res;
         double pose_log_prob = 0.0;
-        trans_diff[1] = csm_map_.RoundToResolution(wheel_odometry.translation.y() + dy, CONFIG_dist_res);
+        trans_diff[1] = csm_map_.RoundToResolution(wheel_odom_.pose.translation.y() + dy, CONFIG_dist_res);
         
         // For each point in scan
         for(std::size_t i = 0; i < scan_cloud_.size(); i++){
@@ -552,13 +695,13 @@ Pose2D<float> ParticleFilter::EstimateLidarOdometry(Pose2D<float> wheel_odometry
           Vector2f scanPos = Eigen::Rotation2Df(angle_diff) * scan_cloud_[i] + trans_diff;
   
           // Ignore scans that don't hit an object
-          if(scanPos.norm() >= CONFIG_csm_eval_range_max) {
+          if(scanPos.norm() >= std::min(CONFIG_csm_eval_range_max, csm_map_.GetMaxRangeInScan())) {
             continue;
           }
 
           try{
             double gaussian_prob = csm_map_.GetLogLikelihoodAtPosition(scanPos.x(), scanPos.y());
-            pose_log_prob += CONFIG_gamma*gaussian_prob;
+            pose_log_prob += CONFIG_csm_gamma*gaussian_prob;
           } catch(std::out_of_range) {
             continue;
           }
@@ -569,8 +712,8 @@ Pose2D<float> ParticleFilter::EstimateLidarOdometry(Pose2D<float> wheel_odometry
     }
 
     likelihood_cube_.DrawCSMImage();
-    return T;
-    // return debug_T;
+
+    lidar_odom_ = PoseWithCovariance(T, covariance);
 }
 
 void ParticleFilter::ObserveLaser(const vector<float>& ranges,
@@ -579,14 +722,11 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
                                   float angle_min,
                                   float angle_max,
                                   float angle_increment) {
-
-  // Eigen::Vector2f test_trans(0.1, 0.05);
-  // float angle = 0.1;
-
+                                    
   // Initialize cloud on first laser msg
   if(!csm_map_initialized){
-    csm_map_ = csm_map::CSMMap(CONFIG_map_length_dist, CONFIG_dist_res, CONFIG_min_map_prob, CONFIG_range_max, CONFIG_sigma_observation);
-    low_csm_map_ = csm_map::CSMMap(CONFIG_map_length_dist, CONFIG_low_dist_res, CONFIG_min_map_prob, CONFIG_range_max, CONFIG_sigma_observation);
+    csm_map_ = csm_map::CSMMap(CONFIG_map_length_dist, CONFIG_dist_res, CONFIG_min_map_prob, CONFIG_range_max, CONFIG_csm_sigma_observation);
+    low_csm_map_ = csm_map::CSMMap(CONFIG_map_length_dist, CONFIG_low_dist_res, CONFIG_min_map_prob, CONFIG_range_max, CONFIG_csm_sigma_observation);
     scan_cloud_ = vector<Vector2f>(ranges.size());
 
     ConvertScanToPointCloud(angle_min, angle_increment, ranges, scan_cloud_);
@@ -599,41 +739,67 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
   }
 
   // Calculate motion since last update
-  double odom_dist = (last_update_loc_ - prev_odom_loc_).norm();
-  // COMMENT FOR SINGLE SCAN TEST
-  //double delta_angle = angle + 0.0;
-  double delta_angle = math_util::AngleDiff(prev_odom_angle_, last_update_angle_);
+  double odom_dist = (wheel_odom_.pose.translation).norm();
+  double delta_angle = wheel_odom_.pose.angle;
 
   // Update only if motion exceeds update threshold
-  if(odom_dist > CONFIG_min_update_dist || std::abs(delta_angle) > CONFIG_min_update_angle){
+  if((odom_dist > CONFIG_min_update_dist || std::abs(delta_angle) > CONFIG_min_update_angle) && std::strcmp(CONFIG_localization_mode.c_str(), "odom") != 0){
+    low_csm_map_.DrawCSMImage();
     csm_map_.DrawCSMImage();
     // static int i = 0;
     // double start_time = GetMonotonicTime();
 
     // Get Lidar Odometry from Correlative Scan Matching
-    // COMMENTED FOR SINGLE SCAN TEST
     auto rot_to_last_pose = Eigen::Rotation2D<float>(-prev_odom_angle_).toRotationMatrix();
-    //Vector2f odom_loc_diff = test_trans + Eigen::Vector2f(0.0, -0.0);
     Vector2f odom_loc_diff = rot_to_last_pose*(prev_odom_loc_ - last_update_loc_);
+    ConvertScanToPointCloud(angle_min, angle_increment, ranges, scan_cloud_);
 
+    // Estimate Lidar Odometry for new laser scan
+    double start = GetMonotonicTime();
+    EstimateLidarOdometry(); // cloud_, csm_map_
+    double end = GetMonotonicTime();
+
+    std::cout << "Exec Time: " << end - start << std::endl;
+    std::cout << "Min range: "<< CONFIG_csm_eval_range_max << ", " << csm_map_.GetMaxRangeInScan() << ", " << std::min(CONFIG_csm_eval_range_max, csm_map_.GetMaxRangeInScan()) << std::endl;
+    std::cout << "Wheel Odometry: " << wheel_odom_.pose.translation.x() << ", " << wheel_odom_.pose.translation.y() << ", " << wheel_odom_.pose.angle << std::endl;
+    std::cout << "Lidar Odometry: " << lidar_odom_.pose.translation.x() << ", " << lidar_odom_.pose.translation.y() << ", " << lidar_odom_.pose.angle << std::endl;
+
+    if(std::strcmp(CONFIG_localization_mode.c_str(), "lidar") == 0){
+      estimated_odom_.pose.ApplyPose(lidar_odom_.pose);
+      estimated_odom_.covariance += lidar_odom_.covariance;
+    }
+
+    vector<Vector2f> tf_scan(ranges.size());
+    vector<Vector2f> odom_scan(ranges.size());
+    for(std::size_t i = 0; i < tf_scan.size(); i++){
+      tf_scan[i] = Eigen::Rotation2D<float>(lidar_odom_.pose.angle)*scan_cloud_[i] + lidar_odom_.pose.translation;
+      odom_scan[i] = Eigen::Rotation2D<float>(wheel_odom_.pose.angle)*scan_cloud_[i] + wheel_odom_.pose.translation;
+    }
+    
+    //low_csm_map_.DrawScanCloudOnImage(tf_scan, CONFIG_csm_eval_range_max);
+    csm_map_.DrawScanCloudOnImage(tf_scan, std::min(CONFIG_csm_eval_range_max, csm_map_.GetMaxRangeInScan()), false);
+    csm_map_.DrawScanCloudOnImage(odom_scan, std::min(CONFIG_csm_eval_range_max, csm_map_.GetMaxRangeInScan()), true);
+    
+
+    // Update cost map with new cloud_
+    csm_map_.GenerateMapFromNewScan(scan_cloud_);
+    low_csm_map_.GenerateMapFromNewScan(scan_cloud_);
+
+    last_update_loc_ = prev_odom_loc_;
+    last_update_angle_ = prev_odom_angle_;
+    lidar_odom_ = PoseWithCovariance();
+    wheel_odom_ = PoseWithCovariance();
+
+    return;
+
+    // EKF Update
+    UpdateEKF();
 
     // Initialize Particle Filter Update variables
     max_weight_log_ = -1e10;
     weight_sum_ = 0;
     weight_bins_.resize(particles_.size());
     std::fill(weight_bins_.begin(), weight_bins_.end(), 0);
-
-    // COMMENT FOR SINGLE SCAN TEST
-    ConvertScanToPointCloud(angle_min, angle_increment, ranges, scan_cloud_);
-
-    // Estimate Lidar Odometry for new laser scan
-    Pose2D<float> wheel_odom(delta_angle, odom_loc_diff);
-    double start = GetMonotonicTime();
-    Pose2D<float> lidar_odom = EstimateLidarOdometry(wheel_odom); // cloud_, csm_map_
-    double end = GetMonotonicTime();
-    std::cout << "Exec Time: " << end - start << std::endl;
-    std::cout << "Wheel Odometry: " << wheel_odom.translation.x() << ", " << wheel_odom.translation.y() << ", " << wheel_odom.angle << std::endl;
-    std::cout << "Lidar Odometry: " << lidar_odom.translation.x() << ", " << lidar_odom.translation.y() << ", " << lidar_odom.angle << std::endl;
 
     // Update each particle with log error weight and find largest weight (smallest negative number)
     //double particle_update_start = GetMonotonicTime();
@@ -681,60 +847,20 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
     // }
     // i++;
 
-    vector<Vector2f> tf_scan(ranges.size());
-    for(std::size_t i = 0; i < tf_scan.size(); i++){
-      tf_scan[i] = Eigen::Rotation2D<float>(lidar_odom.angle)*scan_cloud_[i] + lidar_odom.translation;
-    }
+    // vector<Vector2f> tf_scan(ranges.size());
+    // for(std::size_t i = 0; i < tf_scan.size(); i++){
+    //   tf_scan[i] = Eigen::Rotation2D<float>(lidar_odom_.pose.angle)*scan_cloud_[i] + lidar_odom_.pose.translation;
+    // }
     
-    csm_map_.DrawScanCloudOnImage(tf_scan, CONFIG_csm_eval_range_max);
+    // csm_map_.DrawScanCloudOnImage(tf_scan, CONFIG_csm_eval_range_max);
 
-    // Update cost map with new cloud_
-    csm_map_.GenerateMapFromNewScan(scan_cloud_);
-    low_csm_map_.GenerateMapFromNewScan(scan_cloud_);
+    // // Update cost map with new cloud_
+    // csm_map_.GenerateMapFromNewScan(scan_cloud_);
+    // low_csm_map_.GenerateMapFromNewScan(scan_cloud_);
   }                     
 }
 
-void ParticleFilter::Predict(const Vector2f& odom_loc,
-                             const float odom_angle) {
-  // A new odometry value is available (in the odom frame)
-  // propagate particles forward based on odometry.
 
-  // rotation matrix from last odom to last baselink
-  auto rot_odom1_to_bl1 = Eigen::Rotation2D<float>(-prev_odom_angle_).toRotationMatrix();
-  
-  // Change in translation and angle from odometry
-  Eigen::Vector2f delta_translation = rot_odom1_to_bl1 * (odom_loc - prev_odom_loc_);
-  float delta_angle = math_util::AngleDiff(odom_angle, prev_odom_angle_);
-
-  for(Particle &particle: particles_){
-    // Get noisy angle
-    float sigma_tht = CONFIG_k5 * delta_translation.norm() + CONFIG_k6 * abs(delta_angle);
-    float noisy_angle = delta_angle + rng_.Gaussian(0.0, sigma_tht);
-
-    // Get translation noise in Base Link 2
-    float sigma_x = CONFIG_k1 * delta_translation.norm() + CONFIG_k2 * abs(delta_angle);;
-    float sigma_y = CONFIG_k3 * delta_translation.norm() + CONFIG_k4 * abs(delta_angle);
-    Eigen::Vector2f e_xy = Eigen::Vector2f((float) rng_.Gaussian(0.0, sigma_x),(float) rng_.Gaussian(0.0, sigma_y));
-
-    // Transform noise to Base Link 1 using estimated angle to get noisy translation
-    auto rot_b2_to_b1 = Eigen::Rotation2D<float>(delta_angle).toRotationMatrix();
-    Eigen::Vector2f noisy_translation = delta_translation + rot_b2_to_b1 * e_xy; // in previous base_link
-    
-    // Transform noise to map using current particle angle
-    auto rot_bl1_to_map = Eigen::Rotation2D<float>(particle.angle).toRotationMatrix();
-    particle.loc += rot_bl1_to_map * noisy_translation;   
-    particle.angle += noisy_angle;        
-  }
-
-  // Update previous odometry
-  prev_odom_loc_ = odom_loc;
-  prev_odom_angle_ = odom_angle;
-
-  // double d_translation = (last_update_loc_ - prev_odom_loc_).norm();
-  // double d_angle = math_util::AngleDiff(last_update_angle_, prev_odom_angle_);
-
-  // std::cout << "Motion Model: " << d_translation << ", " << d_angle << std::endl;
-}
 
 void ParticleFilter::Initialize(const string& map_file,
                                 const Vector2f& loc,
@@ -755,16 +881,11 @@ void ParticleFilter::Initialize(const string& map_file,
   max_weight_log_ = 0;
   last_update_loc_ = prev_odom_loc_;
   last_update_angle_ = prev_odom_angle_;
+
+  estimated_odom_ = PoseWithCovariance();
+
   map_.Load(map_file);
   SortMap();
-}
-
-bool ParticleFilter::horizontal_line_compare(const geometry::line2f l1, const geometry::line2f l2){
-  return l1.p0.y() < l2.p0.y();
-}
-
-bool ParticleFilter::vertical_line_compare(const geometry::line2f l1, const geometry::line2f l2){
-  return l1.p0.x() < l2.p0.x();
 }
 
 void ParticleFilter::SortMap(){
@@ -806,18 +927,14 @@ void ParticleFilter::GetLocation(Eigen::Vector2f* loc_ptr,
   loc /= weight_sum_;
   angle_point /= weight_sum_;
   angle = atan2(angle_point[1], angle_point[0]);
-}
+  Pose2D<float> curr_pose(angle, loc);
+  // std::cout << "Get Location: " << curr_pose.translation.x() << ", " << curr_pose.translation.y() << ", " << curr_pose.angle << std::endl;
+  // std::cout << "Estimated: " << estimated_odom_.pose.translation.x() << ", " << estimated_odom_.pose.translation.y() << ", " << estimated_odom_.pose.angle << std::endl;
+  curr_pose.ApplyPose(estimated_odom_.pose);
 
-Eigen::Vector2f ParticleFilter::BaseLinkToSensorFrame(const Eigen::Vector2f &loc, const float &angle){
-  return loc + Vector2f(CONFIG_laser_offset*cos(angle), CONFIG_laser_offset*sin(angle));
-}
-
-csm_map::CSMMap ParticleFilter::GetCSMMap(){
-  return csm_map_;
-}
-
-csm_map::CSMMap ParticleFilter::GetLRCSMMap(){
-  return low_csm_map_;
+  // Undo comment for temp particle filter motion localization
+  loc = curr_pose.translation;
+  angle = curr_pose.angle;
 }
 
 }  // namespace particle_filter

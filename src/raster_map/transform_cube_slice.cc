@@ -44,14 +44,22 @@ namespace transform_cube_slice {
     }
 
     void TransformCubeSlice::DrawCSMImage(){
-        image = cv::Mat(row_num, row_num, CV_8UC3, cv::Scalar(255, 255, 255));
+        image = cv::Mat(2*row_num, 2*row_num, CV_8UC3, cv::Scalar(255, 255, 255));
         for(int x = 0; x < row_num; x++){
             for(int y = 0; y < row_num; y++){
                 // Image coordinate frame is LHR, BGR
                 int image_y = row_num - y - 1;
-                image.at<cv::Vec3b>(image_y, x)[0] = 255 - (int) (255*exp(prob_map[x][y] - max_likelihood));
-                image.at<cv::Vec3b>(image_y, x)[1] = 255 - (int) (255*exp(prob_map[x][y] - max_likelihood));
-                image.at<cv::Vec3b>(image_y, x)[2] = 255;
+                for(int px = -1; px <= 0; px++){
+                    for(int py = -1; py <= 0; py++){
+                        int xd = std::min(std::max(2*x + px, 0), 2*row_num - 1);
+                        int yd = std::min(std::max(2*image_y + py, 0), 2*row_num - 1);
+                        
+                        image.at<cv::Vec3b>(yd, xd)[0] = 255 - (int) (255*exp(prob_map[x][y] - max_likelihood));
+                        image.at<cv::Vec3b>(yd, xd)[1] = 255 - (int) (255*exp(prob_map[x][y] - max_likelihood));
+                        image.at<cv::Vec3b>(yd, xd)[2] = 255;
+                    }
+                }
+
             }
         }
     }

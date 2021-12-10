@@ -42,10 +42,10 @@ class CSMMap : public xy_raster_map::XYRasterMap {
          * @param map_dimension length/width of map in meters
          * @param dist_res dimension of map grid squares in meters
          * @param init_grid_val initial grid values as double
-         * @param range_max maximum range to consider scan points
+         * @param default_range_max maximum range to consider scan points
          * @param sigma_observation standard deviation of laser scan range
          */
-        CSMMap(double map_dimension, double dist_res, double init_grid_val,  double range_max, double sigma_observation);
+        CSMMap(double map_dimension, double dist_res, double init_grid_val,  double default_range_max, double sigma_observation);
 
         /**
          * @brief Clears scan map and regenerates given a new laser scan
@@ -104,15 +104,23 @@ class CSMMap : public xy_raster_map::XYRasterMap {
         void DrawCSMImage();
 
         /**
-         * @brief Draws points on the image as black 3x3 squares
+         * @brief Draws points on the image as 3x3 squares
          * 
          * @param cloud vector of cartesian points
          */
-        void DrawScanCloudOnImage(const std::vector<Eigen::Vector2f> &cloud, const double range_max);
+        void DrawScanCloudOnImage(const std::vector<Eigen::Vector2f> &cloud, const double range_max, bool alt_color);
+
+        /**
+         * @brief Returns the maximum range observed in the current rasterized scan
+         * 
+         * @return maximum range observed in scan as double in meters
+         */
+        double GetMaxRangeInScan();
 
     private:
-        double range_max;
+        double default_range_max;
         double sigma_observation;
+        double max_range_in_scan = 0.0;
 
 };
 

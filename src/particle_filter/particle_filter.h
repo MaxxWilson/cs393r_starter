@@ -20,18 +20,27 @@
 //========================================================================
 
 #include <algorithm>
+#include <iostream>
 #include <vector>
+#include <cmath>
 
 #include "eigen3/Eigen/Dense"
 #include "eigen3/Eigen/Geometry"
+
 #include "shared/math/line2d.h"
 #include "shared/math/poses_2d.h"
 #include "shared/util/random.h"
+#include "shared/math/geometry.h"
+#include "shared/math/math_util.h"
+#include "shared/util/timer.h"
+
 #include "vector_map/vector_map.h"
 #include "visualization/visualization.h"
 
+#include "gflags/gflags.h"
+#include "glog/logging.h"
+
 #include "raster_map/csm_map.h"
-#include "raster_map/low_csm_map.h"
 #include "raster_map/transform_cube_slice.h"
 
 #ifndef SRC_PARTICLE_FILTER_H_
@@ -56,11 +65,36 @@ struct SearchRegion {
   SearchRegion(int theta_index, int x_index, int y_index, double prob):
   theta_index(theta_index), x_index(x_index), y_index(y_index), prob(prob){ 
   }
-  // bool operator==(const SearchRegion& other) const
-  // {
-  //   return (x_index == other.x_index && y_index == other.y_index && theta_index == other.theta_index);
-  // }
 };
+
+struct PoseWithCovariance {
+  Pose2D<float> pose;
+  Eigen::Matrix3f covariance;
+
+  PoseWithCovariance(){
+    pose = Pose2D<float>(0, Eigen::Vector2f(0, 0));
+    covariance = Eigen::Matrix3f::Zero();
+  }
+
+  PoseWithCovariance(float rotation, Eigen::Vector2f translation, Eigen::Matrix3f covariance){
+    this->pose = Pose2D<float>(rotation, translation);
+    this->covariance = covariance;
+  }
+
+  PoseWithCovariance(Pose2D<float> pose, Eigen::Matrix3f covariance){
+    this->pose = pose;
+    this->covariance = covariance;
+  }
+
+  Eigen::Vector3f GetStateVector(){
+    return Eigen::Vector3f(pose.translation.x(), pose.translation.y(), pose.angle);
+  }
+
+  void SetStateVector(Eigen::Vector3f new_state){
+    this->pose = Pose2D<float>(new_state[2], Eigen::Vector2f(new_state[0],new_state[1]));
+  }
+};
+
 struct CompareProb {
     bool operator()(struct SearchRegion const& p1, struct SearchRegion const& p2)
     {
@@ -85,8 +119,7 @@ class ParticleFilter {
                     float angle_increment);
 
   // Predict particle motion based on odometry.
-  void Predict(const Eigen::Vector2f& odom_loc,
-                       const float odom_angle);
+  void Predict(const Eigen::Vector2f& odom_loc, const float odom_angle);
 
   // Initialize the robot location.
   void Initialize(const std::string& map_file,
@@ -112,13 +145,17 @@ class ParticleFilter {
 
   void LowVarianceResample();
 
+  void PredictEKF(const Eigen::Vector2f& odom_loc, const float odom_angle);
+
+  void UpdateEKF();
+
   void SortMap();
   static bool horizontal_line_compare(const geometry::line2f l1, const geometry::line2f l2);
   static bool vertical_line_compare(const geometry::line2f l1, const geometry::line2f l2);
 
   void ConvertScanToPointCloud(const float angle_min, const float angle_increment, const std::vector<float>& ranges, std::vector<Eigen::Vector2f> &cloud);
 
-  Pose2D<float> EstimateLidarOdometry(Pose2D<float> wheel_odometry);
+  void EstimateLidarOdometry();
 
   // For debugging: get predicted point cloud from current location.
   void GetPredictedPointCloud(const Eigen::Vector2f& loc,
@@ -148,6 +185,9 @@ class ParticleFilter {
   void ComputeCovariance(Eigen::Vector2f odom, float angle, float prob);
   Eigen::Matrix3f ComputeCovariance();
 
+  PoseWithCovariance estimated_odom_;
+  PoseWithCovariance wheel_odom_;
+  PoseWithCovariance lidar_odom_;
 
   // List of particles being tracked.
   std::vector<Particle> particles_;
@@ -166,9 +206,11 @@ class ParticleFilter {
   float prev_odom_angle_;
   bool odom_initialized_;
 
-  // Eigen::Vector2f first_odom_loc;
-  // float first_odom_angle;
-  // bool first_odom_flag = true;
+  //TODO: refactor with underscores
+  //Uncertainty Matrix from Environment - updates when there is new odometry 
+  Eigen::Matrix3f Q;
+  //mean of odometry transform distribution 
+  Eigen::Vector3f uq;
   
   csm_map::CSMMap csm_map_;
   csm_map::CSMMap low_csm_map_;
@@ -179,7 +221,7 @@ class ParticleFilter {
 
   std::vector<double> weight_bins_;
   double max_weight_log_ = 0;
-  double weight_sum_ = 0;
+  double weight_sum_ = 1.0;
 
   Eigen::Vector2f last_update_loc_;
   float last_update_angle_;

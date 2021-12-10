@@ -32,10 +32,10 @@ namespace csm_map{
         double map_half_dimension,
         double dist_res,
         double init_grid_val, 
-        double range_max,
+        double default_range_max,
         double sigma_observation) :
         xy_raster_map::XYRasterMap(map_half_dimension, dist_res, init_grid_val),
-        range_max(range_max),
+        default_range_max(default_range_max),
         sigma_observation(sigma_observation)
         {
     }
@@ -47,6 +47,7 @@ namespace csm_map{
      */
     void CSMMap::GenerateMapFromNewScan(const std::vector<Eigen::Vector2f> &cloud){
         ClearMap();
+        max_range_in_scan = 0.0;
 
         // For square kernel of odd size, length / 2 - 1, EX. 5x5 -> 2, 17x17 -> 8
         // Size Kernel based on Std of sensor measurement, where past 3 sigma probabilty falls off to zero
@@ -54,8 +55,12 @@ namespace csm_map{
 
         // Iterate through rays in scan
         for(std::size_t i = 0; i < cloud.size(); i++){
-            if(cloud[i].norm() > range_max){
+            double point_range = cloud[i].norm();
+            if(point_range > default_range_max){
                 continue;
+            }
+            else{
+                max_range_in_scan = std::max(max_range_in_scan, point_range);
             }
             auto x = cloud[i].x();
             auto y = cloud[i].y();
@@ -115,7 +120,7 @@ namespace csm_map{
         }
     }
 
-    void CSMMap::DrawScanCloudOnImage(const std::vector<Eigen::Vector2f> &cloud, const double range_max){
+    void CSMMap::DrawScanCloudOnImage(const std::vector<Eigen::Vector2f> &cloud, const double range_max, bool alt_color){
         for(Eigen::Vector2f point: cloud){
             try{
                 if(point.norm() >= range_max) {
@@ -129,7 +134,7 @@ namespace csm_map{
                 for(int x = xIdx; x <= xIdx; x++){
                     for(int y = image_y; y <= image_y; y++){
                         image.at<cv::Vec3b>(y, x)[0] = 0;
-                        image.at<cv::Vec3b>(y, x)[1] = 0;
+                        image.at<cv::Vec3b>(y, x)[1] = (alt_color) ? 255 : 0;
                         image.at<cv::Vec3b>(y, x)[2] = 0;
                     }
                 }
@@ -164,5 +169,9 @@ namespace csm_map{
 
     double CSMMap::ConvertLogToStandard(const double log_likelihood) const{
         return 1/(sigma_observation*sqrt(2*M_PI))*exp(log_likelihood);
+    }
+
+    double CSMMap::GetMaxRangeInScan(){
+        return max_range_in_scan;
     }
 } // namespace CSMMap

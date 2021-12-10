@@ -71,7 +71,7 @@ namespace xy_raster_map
          * @param res decimal resolution in meters
          * @return float rounded value
          */
-        float RoundToResolution(float value, float res) const;
+        static float RoundToResolution(float value, float res);
 
         /**
          * @brief Get map index from a given position distance

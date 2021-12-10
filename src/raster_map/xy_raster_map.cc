@@ -52,7 +52,7 @@ namespace xy_raster_map{
         return image;
     }
 
-    float XYRasterMap::RoundToResolution(const float value, const float res) const{
+     float XYRasterMap::RoundToResolution(const float value, const float res){
         return ((float) ((int) (value/res + 0.5*math_util::Sign(value))))*res;
     }
 
