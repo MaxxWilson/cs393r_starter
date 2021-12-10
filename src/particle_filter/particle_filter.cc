@@ -520,7 +520,7 @@ void ParticleFilter::EstimateLidarOdometry(){
           double pose_log_prob = 0.0;
 
           // For each point in scan
-          for(std::size_t i = 0; i < scan_cloud_.size(); i++){
+          for(std::size_t i = 0; i < scan_cloud_.size(); i+=4){
 
             // Transform new point into frame of previous scan / reference image
             Vector2f scanPos = Eigen::Rotation2Df(angle_diff) * scan_cloud_[i] + trans_diff;
@@ -597,7 +597,7 @@ void ParticleFilter::EstimateLidarOdometry(){
               double pose_log_prob = 0.0;
               
               // For each point in scan
-              for(std::size_t i = 0; i < scan_cloud_.size(); i++){
+              for(std::size_t i = 0; i < scan_cloud_.size(); i+=4){
 
                 // Transform new point into frame of previous scan / reference image
                 Vector2f scanPos = Eigen::Rotation2Df(angle_diff) * scan_cloud_[i] + trans_diff;
@@ -632,8 +632,10 @@ void ParticleFilter::EstimateLidarOdometry(){
       }
     }
     covariance = ComputeCovariance();
-    std::cout << std::endl << covariance << std::endl << std::endl;
+    //std::cout << std::endl << covariance << std::endl << std::endl;
     
+    std::cout << "X/Y/Theta STD: " << sqrt(covariance(0, 0)) << ", " << sqrt(covariance(1, 1)) << ", " << sqrt(covariance(2, 2)) << std::endl;
+
     // // Produces Image for most likely theta
     // float lr_angle_diff = low_T.angle;
     // // For each possible X
@@ -689,7 +691,7 @@ void ParticleFilter::EstimateLidarOdometry(){
         trans_diff[1] = csm_map_.RoundToResolution(wheel_odom_.pose.translation.y() + dy, CONFIG_dist_res);
         
         // For each point in scan
-        for(std::size_t i = 0; i < scan_cloud_.size(); i++){
+        for(std::size_t i = 0; i < scan_cloud_.size(); i+=4){
 
           // Transform new point into frame of previous scan / reference image
           Vector2f scanPos = Eigen::Rotation2Df(angle_diff) * scan_cloud_[i] + trans_diff;
@@ -760,7 +762,6 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
     double end = GetMonotonicTime();
 
     std::cout << "Exec Time: " << end - start << std::endl;
-    std::cout << "Min range: "<< CONFIG_csm_eval_range_max << ", " << csm_map_.GetMaxRangeInScan() << ", " << std::min(CONFIG_csm_eval_range_max, csm_map_.GetMaxRangeInScan()) << std::endl;
     std::cout << "Wheel Odometry: " << wheel_odom_.pose.translation.x() << ", " << wheel_odom_.pose.translation.y() << ", " << wheel_odom_.pose.angle << std::endl;
     std::cout << "Lidar Odometry: " << lidar_odom_.pose.translation.x() << ", " << lidar_odom_.pose.translation.y() << ", " << lidar_odom_.pose.angle << std::endl;
 

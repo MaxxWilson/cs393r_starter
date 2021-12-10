@@ -44,22 +44,22 @@ angle_update_thresh = 0.2 -- 15°
 
 -- CSM Search --
 
-csm_sigma_observation = 0.1
-csm_gamma = 0.003
+csm_sigma_observation = 0.05
+csm_gamma = 0.05
 
-low_theta_res = 0.1 -- 0.05 -- 50 cm
-low_dist_res = 0.25 -- 0.05 -- 50 cm
+low_theta_res = 0.08 -- 0.05 -- 50 cm
+low_dist_res = 0.15 -- 0.05 -- 50 cm
 
-dist_res = 0.02 -- 0.05 -- 50 cm
-theta_res = 0.015 -- 0.02 -- ~5°
+dist_res = 0.05 -- 0.05 -- 50 cm
+theta_res = 0.04 -- 0.02 -- ~5°
 csm_eval_range_max =  8.5
 
-theta_search_range = 1.0
-dist_search_range = 2.0
+theta_search_range = 0.15
+dist_search_range = 0.15
 
 map_length_dist = dist_update_thresh + range_max + laser_offset + 4*sigma_observation + 0.5
 row_num = 2*(map_length_dist)/dist_res + 1
 
-min_map_prob = -1e3
+min_map_prob = -70
 
 localization_mode = "lidar" -- "odom", "lidar", "ekf", "ekf_pf"
