@@ -14,12 +14,12 @@ init_y_sigma = 0.3 -- 99% of the time, within a meter
 init_r_sigma = 0.3  -- 99% of the time, its within 35 deg
 
 -- Motion Model Params --
-k1 = 0.4   -- x error from translation         -- 95% of translations are within 15% margin of error
+k1 = 3.0   -- x error from translation         -- 95% of translations are within 15% margin of error
 k2 = 0.0   -- x error from rotation            -- This is effectively zero given the small angle approx
-k3 = 0.1   -- y error from translation         -- This is effectively zero given the small angle approx
-k4 = 0.3   -- y error from rotation            -- at 45 deg, 99% of values within 10 cm
-k5 = 0.5   -- rotation error from translation  -- at 1m, 99% of values within 7 deg
-k6 = 1.5    -- rotation error from rotation     -- 95% of translations are within 15% margin of error
+k3 = 1.0   -- y error from translation         -- This is effectively zero given the small angle approx
+k4 = 1.5   -- y error from rotation            -- at 45 deg, 99% of values within 10 cm
+k5 = 1.5   -- rotation error from translation  -- at 1m, 99% of values within 7 deg
+k6 = 3.0    -- rotation error from rotation     -- 95% of translations are within 15% margin of error
 
 min_update_dist = 0.3                       -- Based on odometry messages at 1m/s at 40Hz
 min_update_angle = 0.2
@@ -44,7 +44,7 @@ angle_update_thresh = 0.2 -- 15°
 
 -- CSM Search --
 
-csm_sigma_observation = 0.05
+csm_sigma_observation = 0.1
 csm_gamma = 0.05
 
 low_theta_res = 0.08 -- 0.05 -- 50 cm
@@ -62,4 +62,4 @@ row_num = 2*(map_length_dist)/dist_res + 1
 
 min_map_prob = -70
 
-localization_mode = "lidar" -- "odom", "lidar", "ekf", "ekf_pf"
+localization_mode = "ekf" -- "odom", "lidar", "ekf", "ekf_pf"

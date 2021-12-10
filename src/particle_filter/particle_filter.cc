@@ -328,6 +328,7 @@ void ParticleFilter::PredictEKF(const Eigen::Vector2f& odom_loc, const float odo
     // Update odometry estimate
     estimated_odom_.pose = wheel_odom_.pose;
     estimated_odom_.covariance = wheel_odom_.covariance;
+    std::cout << "X/Y/Theta STD: " << sqrt(estimated_odom_.covariance(0, 0)) << ", " << sqrt(estimated_odom_.covariance(1, 1)) << ", " << sqrt(estimated_odom_.covariance(2, 2)) << std::endl;
   }
 
   // std::cout << "Odometry: " << delta_translation.x() << ", " << delta_translation.y() << ", " << delta_angle << std::endl;
@@ -345,22 +346,35 @@ void ParticleFilter::PredictEKF(const Eigen::Vector2f& odom_loc, const float odo
  * Odometry and Lidar distrbutions are fused during has_new_lidar block
  */
 void ParticleFilter::UpdateEKF(){
-  std::cout << "EKF Update" << std::endl;
+  std::cout << std::endl << "EKF Update" << std::endl;
   //Kalman Gain K - wheel_odom_.covariance = Q, lidar_odom_.covariance = R
   //K = Q * (Q+R)^-1
   Eigen::Matrix3f K = wheel_odom_.covariance * (wheel_odom_.covariance + lidar_odom_.covariance).inverse();
+
+  // std::cout << "Wheel and Lidar Covariance: " << std::endl << wheel_odom_.covariance << std::endl << lidar_odom_.covariance << std::endl << std::endl;
+
+  // std::cout << "K: " << K << std::endl << std::endl;
+
+  // std::cout << "Inverted: " << std::endl << (wheel_odom_.covariance + lidar_odom_.covariance).inverse() << std::endl << std::endl;
 
   //New mean of combined Predicted state and Sensor state distributions
   //mean_state is mean of predicted distribution uq is mean of sensor distribution
   //ut = uq + K * (ur -uq)
   Eigen::Vector3f ut = wheel_odom_.GetStateVector() + K * (lidar_odom_.GetStateVector() - wheel_odom_.GetStateVector());
-  std::cout << "Lidar State: " << std::endl << lidar_odom_.GetStateVector() << std::endl;
-  
-  std::cout << "Fused State: " << std::endl << ut << std::endl;
-  estimated_odom_.SetStateVector(ut);
+  estimated_odom_.pose.ApplyPose(Pose2D<float>(ut[2], Eigen::Vector2f(ut[0], ut[1])));
+
   //New COV of combined Predicted state and Sensor state distributions
   //COVt = Q - K * Q
-  estimated_odom_.covariance =  lidar_odom_.covariance - K * lidar_odom_.covariance;
+  estimated_odom_.covariance = wheel_odom_.covariance - K * wheel_odom_.covariance;
+
+  // std::cout << "Wheel Odometry: " << wheel_odom_.pose.translation.x() << ", " << wheel_odom_.pose.translation.y() << ", " << wheel_odom_.pose.angle << std::endl;
+  // std::cout << "X/Y/Theta STD: " << sqrt(wheel_odom_.covariance(0, 0)) << ", " << sqrt(wheel_odom_.covariance(1, 1)) << ", " << sqrt(wheel_odom_.covariance(2, 2)) << std::endl << std::endl;
+  
+  // std::cout << "Lidar Odometry: " << lidar_odom_.pose.translation.x() << ", " << lidar_odom_.pose.translation.y() << ", " << lidar_odom_.pose.angle << std::endl;
+  // std::cout << "X/Y/Theta STD: " << sqrt(lidar_odom_.covariance(0, 0)) << ", " << sqrt(lidar_odom_.covariance(1, 1)) << ", " << sqrt(lidar_odom_.covariance(2, 2)) << std::endl << std::endl;
+
+  // std::cout << "Estimated Odometry: " << estimated_odom_.pose.translation.x() << ", " << estimated_odom_.pose.translation.y() << ", " << estimated_odom_.pose.angle << std::endl;
+  // std::cout << "X/Y/Theta STD: " << sqrt(estimated_odom_.covariance(0, 0)) << ", " << sqrt(estimated_odom_.covariance(1, 1)) << ", " << sqrt(estimated_odom_.covariance(2, 2)) << std::endl;
 }
 
 // Update the weight of the particle based on how well it fits the observation
@@ -634,7 +648,7 @@ void ParticleFilter::EstimateLidarOdometry(){
     covariance = ComputeCovariance();
     //std::cout << std::endl << covariance << std::endl << std::endl;
     
-    std::cout << "X/Y/Theta STD: " << sqrt(covariance(0, 0)) << ", " << sqrt(covariance(1, 1)) << ", " << sqrt(covariance(2, 2)) << std::endl;
+    //std::cout << "X/Y/Theta STD: " << sqrt(covariance(0, 0)) << ", " << sqrt(covariance(1, 1)) << ", " << sqrt(covariance(2, 2)) << std::endl;
 
     // // Produces Image for most likely theta
     // float lr_angle_diff = low_T.angle;
@@ -715,7 +729,12 @@ void ParticleFilter::EstimateLidarOdometry(){
 
     likelihood_cube_.DrawCSMImage();
 
-    lidar_odom_ = PoseWithCovariance(T, covariance);
+    Eigen::Matrix3f independent_covariance;
+    independent_covariance << covariance(0, 0),                          0,                            0,
+                              0,                          covariance(1, 1),                            0,
+                              0,                                         0,             covariance(2, 2);
+
+    lidar_odom_ = PoseWithCovariance(T, independent_covariance);
 }
 
 void ParticleFilter::ObserveLaser(const vector<float>& ranges,
@@ -761,9 +780,9 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
     EstimateLidarOdometry(); // cloud_, csm_map_
     double end = GetMonotonicTime();
 
-    std::cout << "Exec Time: " << end - start << std::endl;
-    std::cout << "Wheel Odometry: " << wheel_odom_.pose.translation.x() << ", " << wheel_odom_.pose.translation.y() << ", " << wheel_odom_.pose.angle << std::endl;
-    std::cout << "Lidar Odometry: " << lidar_odom_.pose.translation.x() << ", " << lidar_odom_.pose.translation.y() << ", " << lidar_odom_.pose.angle << std::endl;
+    // std::cout << "Exec Time: " << end - start << std::endl;
+    // std::cout << "Wheel Odometry: " << wheel_odom_.pose.translation.x() << ", " << wheel_odom_.pose.translation.y() << ", " << wheel_odom_.pose.angle << std::endl;
+    // std::cout << "Lidar Odometry: " << lidar_odom_.pose.translation.x() << ", " << lidar_odom_.pose.translation.y() << ", " << lidar_odom_.pose.angle << std::endl;
 
     if(std::strcmp(CONFIG_localization_mode.c_str(), "lidar") == 0){
       estimated_odom_.pose.ApplyPose(lidar_odom_.pose);
@@ -786,15 +805,17 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
     csm_map_.GenerateMapFromNewScan(scan_cloud_);
     low_csm_map_.GenerateMapFromNewScan(scan_cloud_);
 
+    if(std::strcmp(CONFIG_localization_mode.c_str(), "ekf") == 0){
+      // EKF Update
+      UpdateEKF();
+    }
+
     last_update_loc_ = prev_odom_loc_;
     last_update_angle_ = prev_odom_angle_;
     lidar_odom_ = PoseWithCovariance();
     wheel_odom_ = PoseWithCovariance();
 
     return;
-
-    // EKF Update
-    UpdateEKF();
 
     // Initialize Particle Filter Update variables
     max_weight_log_ = -1e10;
