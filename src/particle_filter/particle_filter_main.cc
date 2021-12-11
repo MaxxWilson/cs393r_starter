@@ -95,6 +95,11 @@ ros::Publisher low_res_scan_image_publisher_;
 ros::Publisher transform_cube_image_publisher_;
 ros::Publisher low_res_slice_image_publisher_;
 
+ros::Publisher odom_proposal_image_publisher_;
+ros::Publisher lidar_proposal_image_publisher_;
+ros::Publisher ekf_proposal_image_publisher_;
+
+
 vector<Vector2f> trajectory_points_;
 
 void InitializeMsgs() {
@@ -167,6 +172,23 @@ void PublishTFCubeImage(){
   low_res_slice_image_publisher_.publish(low_res_msg);
 }
 
+void PublishEKFImage(){
+  // rosrun rqt_image_view rqt_image_view image:="/tf_cube_image"
+  cv::Mat ekf_image = particle_filter_.GetEKFProposalImage();
+  sensor_msgs::ImagePtr ekf_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", ekf_image).toImageMsg();
+  ekf_proposal_image_publisher_.publish(ekf_msg);
+
+    // rosrun rqt_image_view rqt_image_view image:="/tf_cube_image"
+  cv::Mat lidar_image = particle_filter_.GetLidarProposalImage();
+  sensor_msgs::ImagePtr lidar_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", lidar_image).toImageMsg();
+  lidar_proposal_image_publisher_.publish(lidar_msg);
+
+    // rosrun rqt_image_view rqt_image_view image:="/tf_cube_image"
+  cv::Mat odom_image = particle_filter_.GetOdomProposalImage();
+  sensor_msgs::ImagePtr odom_msg = cv_bridge::CvImage(std_msgs::Header(), "bgr8", odom_image).toImageMsg();
+  odom_proposal_image_publisher_.publish(odom_msg);
+}
+
 void PublishScanImage(){
   // rosrun rqt_image_view rqt_image_view image:="/scan_image"
   cv::Mat image = particle_filter_.GetCSMMap().GetImage();
@@ -194,6 +216,7 @@ void PublishVisualization() {
   PublishTrajectory();
   PublishScanImage();
   PublishTFCubeImage();
+  PublishEKFImage();
   visualization_publisher_.publish(vis_msg_);
 }
 
@@ -306,6 +329,13 @@ int main(int argc, char** argv) {
       n.advertise<sensor_msgs::Image>("low_res_slice_image", 1);
   low_res_scan_image_publisher_ =
       n.advertise<sensor_msgs::Image>("low_res_scan_image", 1);
+
+  lidar_proposal_image_publisher_ =
+      n.advertise<sensor_msgs::Image>("lidar_proposal_image", 1);
+  odom_proposal_image_publisher_ =
+      n.advertise<sensor_msgs::Image>("odom_proposal_image", 1);
+  ekf_proposal_image_publisher_ =
+      n.advertise<sensor_msgs::Image>("ekf_proposal_image", 1);
 
   ProcessLive(&n);
 

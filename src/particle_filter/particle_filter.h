@@ -170,6 +170,10 @@ class ParticleFilter {
   void SetParticlesForTesting(std::vector<Particle> new_particles);
   cv::Mat GetTFCubeImage();
   cv::Mat GetLowResTFCubeImage();
+  
+  cv::Mat GetEKFProposalImage();
+  cv::Mat GetLidarProposalImage();
+  cv::Mat GetOdomProposalImage();
 
   Eigen::Vector2f BaseLinkToSensorFrame(const Eigen::Vector2f &loc, const float &angle);
 
@@ -211,6 +215,9 @@ class ParticleFilter {
   Eigen::Matrix3f Q;
   //mean of odometry transform distribution 
   Eigen::Vector3f uq;
+  transform_cube_slice::TransformCubeSlice odom_proposal_img;
+  transform_cube_slice::TransformCubeSlice lidar_proposal_img;
+  transform_cube_slice::TransformCubeSlice ekf_proposal_img;
   
   csm_map::CSMMap csm_map_;
   csm_map::CSMMap low_csm_map_;
