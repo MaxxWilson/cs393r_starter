@@ -19,7 +19,7 @@ k2 = 0.0   -- x error from rotation            -- This is effectively zero given
 k3 = 0.7   -- y error from translation         -- This is effectively zero given the small angle approx
 k4 = 1.5   -- y error from rotation            -- at 45 deg, 99% of values within 10 cm
 k5 = 2.0   -- rotation error from translation  -- at 1m, 99% of values within 7 deg
-k6 = 5.0    -- rotation error from rotation     -- 95% of translations are within 15% margin of error
+k6 = 6.0    -- rotation error from rotation     -- 95% of translations are within 15% margin of error
 
 min_update_dist = 0.02
 min_update_angle = 0.05
@@ -62,6 +62,6 @@ row_num = 2*(map_length_dist)/dist_res + 1
 
 min_map_prob = -70
 csm_resize = 6
-csm_rot_noise = 0.03
+csm_rot_noise = 0.5
 
-localization_mode = "ekf" -- "odom", "lidar", "ekf", "ekf_pf"
+localization_mode = "ekf_pf" -- "odom", "lidar", "ekf", "ekf_pf"

@@ -366,9 +366,9 @@ void ParticleFilter::PredictEKF(const Eigen::Vector2f& odom_loc, const float odo
  * Odometry and Lidar distrbutions are fused during has_new_lidar block
  */
 void ParticleFilter::UpdateEKF(){
-  odom_proposal_img = transform_cube_slice::TransformCubeSlice(1.0, 0.01, 00);
-  lidar_proposal_img = transform_cube_slice::TransformCubeSlice(1.0, 0.01, 00);
-  ekf_proposal_img = transform_cube_slice::TransformCubeSlice(1.0, 0.01, 00);
+  odom_proposal_img = transform_cube_slice::TransformCubeSlice(0.6, 0.01, 00);
+  lidar_proposal_img = transform_cube_slice::TransformCubeSlice(0.6, 0.01, 00);
+  ekf_proposal_img = transform_cube_slice::TransformCubeSlice(0.6, 0.01, 00);
 
   //Kalman Gain K - wheel_odom_.covariance = Q, lidar_odom_.covariance = R
   //K = Q * (Q+R)^-1
@@ -400,8 +400,8 @@ void ParticleFilter::UpdateEKF(){
   for(int x = 0; x < ekf_proposal_img.GetColNum(); x++){
     for(int y = 0; y < ekf_proposal_img.GetColNum(); y++){
       int image_y = ekf_proposal_img.GetColNum() - y - 1;
-      double x_distance = x*0.01-0.5;
-      double y_distance = y*0.01-0.5;
+      double x_distance = x*0.01-0.6;
+      double y_distance = y*0.01-0.6;
 
       double wheel_odom_prob = exp(-0.5*(wheel_odom_.pose.translation.x() - x_distance)*(wheel_odom_.pose.translation.x() - x_distance)/wheel_odom_.covariance(0, 0))
                               *exp(-0.5*(wheel_odom_.pose.translation.y() - y_distance)*(wheel_odom_.pose.translation.y() - y_distance)/wheel_odom_.covariance(1, 1));
