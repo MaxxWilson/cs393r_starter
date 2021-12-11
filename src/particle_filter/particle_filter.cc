@@ -45,6 +45,8 @@ CONFIG_FLOAT(k1, "k1");
 CONFIG_FLOAT(k2, "k2");
 CONFIG_FLOAT(k3, "k3");
 CONFIG_FLOAT(k4, "k4");
+CONFIG_FLOAT(k5, "k5");
+CONFIG_FLOAT(k6, "k6");
 
 // LIDAR Geometry and Specs
 CONFIG_FLOAT(laser_offset, "laser_offset");
@@ -316,13 +318,27 @@ void ParticleFilter::PredictEKF(const Eigen::Vector2f& odom_loc, const float odo
 
   // Get translation noise in Base Link 2
   float sigma_x = CONFIG_k1 * delta_translation.norm() + CONFIG_k2 * abs(delta_angle);
-  float sigma_y = CONFIG_k1 * delta_translation.norm() + CONFIG_k2 * abs(delta_angle);
-  float sigma_tht = CONFIG_k3 * delta_translation.norm() + CONFIG_k4 * abs(delta_angle);
+  float sigma_y = CONFIG_k3 * delta_translation.norm() + CONFIG_k4 * abs(delta_angle);
+  float sigma_tht = CONFIG_k5 * delta_translation.norm() + CONFIG_k6 * abs(delta_angle);
+
+  // Transform translation noise to Base Link 1 using estimated angle to get noisy translation
+  auto rot_b2_to_b1 = Eigen::Rotation2D<float>(delta_angle).toRotationMatrix();
+  Eigen::Matrix2f bl2_covariance;
+
+  bl2_covariance << math_util::Pow(sigma_x, 2),        0,
+                    0,                                 math_util::Pow(sigma_y, 2);
+
+  Eigen::Matrix2f bl1_cov = rot_b2_to_b1*bl2_covariance*rot_b2_to_b1.transpose();
 
   //sigma_x, sigma_y, sigma_tht are calculated similar to PF Predict function
-  Q <<    math_util::Pow(sigma_x, 2),                          0,                            0,
-          0                         , math_util::Pow(sigma_y, 2),                            0,
+  Q <<    bl1_cov(0, 0),                          bl1_cov(0, 1),                            0,
+          bl1_cov(1, 0)                        , bl1_cov(1, 1),                            0,
           0                         ,                          0, math_util::Pow(sigma_tht, 2);
+
+  // //sigma_x, sigma_y, sigma_tht are calculated similar to PF Predict function
+  // Q <<    math_util::Pow(bl1_sigma.x(), 2),                          0,                            0,
+  //         0                         , math_util::Pow(bl1_sigma.y(), 2),                            0,
+  //         0                         ,                          0, math_util::Pow(sigma_tht, 2);
 
   wheel_odom_.pose.ApplyPose(Pose2D<float>(delta_angle, delta_translation));
   wheel_odom_.covariance += Q;
@@ -349,8 +365,6 @@ void ParticleFilter::PredictEKF(const Eigen::Vector2f& odom_loc, const float odo
  * Odometry and Lidar distrbutions are fused during has_new_lidar block
  */
 void ParticleFilter::UpdateEKF(){
-  std::cout << std::endl << "EKF Update" << std::endl;
-
   odom_proposal_img = transform_cube_slice::TransformCubeSlice(0.5, 0.01, 00);
   lidar_proposal_img = transform_cube_slice::TransformCubeSlice(0.5, 0.01, 00);
   ekf_proposal_img = transform_cube_slice::TransformCubeSlice(0.5, 0.01, 00);
@@ -369,14 +383,14 @@ void ParticleFilter::UpdateEKF(){
   //COVt = Q - K * Q
   estimated_odom_.covariance = wheel_odom_.covariance - K * wheel_odom_.covariance;
 
-  std::cout << "Wheel Odometry: " << wheel_odom_.pose.translation.x() << ", " << wheel_odom_.pose.translation.y() << ", " << wheel_odom_.pose.angle << std::endl;
-  std::cout << "X/Y/Theta STD: " << sqrt(wheel_odom_.covariance(0, 0)) << ", " << sqrt(wheel_odom_.covariance(1, 1)) << ", " << sqrt(wheel_odom_.covariance(2, 2)) << std::endl << std::endl;
+  // std::cout << "Wheel Odometry: " << wheel_odom_.pose.translation.x() << ", " << wheel_odom_.pose.translation.y() << ", " << wheel_odom_.pose.angle << std::endl;
+  // std::cout << "X/Y/Theta STD: " << sqrt(wheel_odom_.covariance(0, 0)) << ", " << sqrt(wheel_odom_.covariance(1, 1)) << ", " << sqrt(wheel_odom_.covariance(2, 2)) << std::endl;
   
-  std::cout << "Lidar Odometry: " << lidar_odom_.pose.translation.x() << ", " << lidar_odom_.pose.translation.y() << ", " << lidar_odom_.pose.angle << std::endl;
-  std::cout << "X/Y/Theta STD: " << sqrt(lidar_odom_.covariance(0, 0)) << ", " << sqrt(lidar_odom_.covariance(1, 1)) << ", " << sqrt(lidar_odom_.covariance(2, 2)) << std::endl << std::endl;
+  // std::cout << "Lidar Odometry: " << lidar_odom_.pose.translation.x() << ", " << lidar_odom_.pose.translation.y() << ", " << lidar_odom_.pose.angle << std::endl;
+  // std::cout << "X/Y/Theta STD: " << sqrt(lidar_odom_.covariance(0, 0)) << ", " << sqrt(lidar_odom_.covariance(1, 1)) << ", " << sqrt(lidar_odom_.covariance(2, 2)) << std::endl;
 
-  std::cout << "Estimated Odometry: " << estimated_odom_.pose.translation.x() << ", " << estimated_odom_.pose.translation.y() << ", " << estimated_odom_.pose.angle << std::endl;
-  std::cout << "X/Y/Theta STD: " << sqrt(estimated_odom_.covariance(0, 0)) << ", " << sqrt(estimated_odom_.covariance(1, 1)) << ", " << sqrt(estimated_odom_.covariance(2, 2)) << std::endl;
+  // std::cout << "Estimated Odometry: " << estimated_odom_.pose.translation.x() << ", " << estimated_odom_.pose.translation.y() << ", " << estimated_odom_.pose.angle << std::endl;
+  // std::cout << "X/Y/Theta STD: " << sqrt(estimated_odom_.covariance(0, 0)) << ", " << sqrt(estimated_odom_.covariance(1, 1)) << ", " << sqrt(estimated_odom_.covariance(2, 2)) << std::endl << std::endl;
 
   cv::Mat odom_img = odom_proposal_img.GetImage();
   cv::Mat lidar_img = lidar_proposal_img.GetImage();
@@ -600,8 +614,6 @@ void ParticleFilter::EstimateLidarOdometry(){
       }     
     }
 
-    std::cout << std::endl;
-
     // Sort search regions by probability, where most likely regions will be evaluated with high-res map first
     std::sort(low_res_queue.begin(), low_res_queue.end(), CompareProb());
 
@@ -764,7 +776,7 @@ void ParticleFilter::EstimateLidarOdometry(){
     Eigen::Matrix3f independent_covariance;
     independent_covariance << covariance(0, 0),                          0,                            0,
                               0,                          covariance(1, 1),                            0,
-                              0,                                         0,             covariance(2, 2) + 0.05;
+                              0,                                         0,             covariance(2, 2) + 0.03;
 
     lidar_odom_ = PoseWithCovariance(T, independent_covariance);
 }
@@ -799,8 +811,8 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
   if((odom_dist > CONFIG_min_update_dist || std::abs(delta_angle) > CONFIG_min_update_angle) && std::strcmp(CONFIG_localization_mode.c_str(), "odom") != 0){
     low_csm_map_.DrawCSMImage();
     csm_map_.DrawCSMImage();
-    // static int i = 0;
-    // double start_time = GetMonotonicTime();
+    static int i = 0;
+    double start_time = GetMonotonicTime();
 
     // Get Lidar Odometry from Correlative Scan Matching
     auto rot_to_last_pose = Eigen::Rotation2D<float>(-prev_odom_angle_).toRotationMatrix();
@@ -812,7 +824,7 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
     EstimateLidarOdometry(); // cloud_, csm_map_
     double end = GetMonotonicTime();
 
-    // std::cout << "Exec Time: " << end - start << std::endl;
+    //std::cout << "Exec Time: " << end - start << std::endl;
     // std::cout << "Wheel Odometry: " << wheel_odom_.pose.translation.x() << ", " << wheel_odom_.pose.translation.y() << ", " << wheel_odom_.pose.angle << std::endl;
     // std::cout << "Lidar Odometry: " << lidar_odom_.pose.translation.x() << ", " << lidar_odom_.pose.translation.y() << ", " << lidar_odom_.pose.angle << std::endl;
 
@@ -842,76 +854,87 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
       UpdateEKF();
     }
 
-    for(Particle &particle: particles_){
+    if(std::strcmp(CONFIG_localization_mode.c_str(), "ekf_pf") == 0){
+      // EKF Update
+      UpdateEKF();
 
-      Eigen::Vector2f e_xy = Eigen::Vector2f((float) rng_.Gaussian(0.0, estimated_odom_.covariance(0,0)),(float) rng_.Gaussian(0.0, estimated_odom_.covariance(1,1)));
-      Eigen::Vector2f noisy_translation = estimated_odom_.pose.translation + e_xy; // in previous base_link
+      for(Particle &particle: particles_){
 
-      float noisy_angle = estimated_odom_.pose.angle + (float) rng_.Gaussian(0.0, estimated_odom_.covariance(2,2));
+        Eigen::Vector2f e_xy = Eigen::Vector2f((float) rng_.Gaussian(0.0, estimated_odom_.covariance(0,0)),(float) rng_.Gaussian(0.0, estimated_odom_.covariance(1,1)));
+        Eigen::Vector2f noisy_translation = estimated_odom_.pose.translation + e_xy; // in previous base_link
+
+        float noisy_angle = estimated_odom_.pose.angle + (float) rng_.Gaussian(0.0, estimated_odom_.covariance(2,2));
+        
+        // Transform noise to map using current particle angle
+        auto rot_bl1_to_map = Eigen::Rotation2D<float>(particle.angle).toRotationMatrix();
+        particle.loc += rot_bl1_to_map * noisy_translation;   
+        particle.angle += noisy_angle;        
+      }
+
+      last_update_loc_ = prev_odom_loc_;
+      last_update_angle_ = prev_odom_angle_;
+      lidar_odom_ = PoseWithCovariance();
+      wheel_odom_ = PoseWithCovariance();
+      estimated_odom_ = PoseWithCovariance();
+
+      // Initialize Particle Filter Update variables
+      max_weight_log_ = -1e10;
+      weight_sum_ = 0;
+      double weight_sum_squared = 0;
+      weight_bins_.resize(particles_.size());
+      std::fill(weight_bins_.begin(), weight_bins_.end(), 0);
+
+      // Update each particle with log error weight and find largest weight (smallest negative number)
+      double particle_update_start = GetMonotonicTime();
+      // double p_update_start = 0;
+      // double p_update_diff_avg = 0;
+      for(Particle &p: particles_){
+        //p_update_start = GetMonotonicTime();
+
+        Update(ranges, range_min, range_max, angle_min, angle_max, &p);
+        max_weight_log_ = std::max(max_weight_log_, p.weight);
+        
+        //p_update_diff_avg += 1000000*(GetMonotonicTime() - p_update_start);
+      }
+      // Update loop profiling
+      double particle_update_diff = 1000*(GetMonotonicTime() - particle_update_start);
+      // p_update_diff_avg /= particles_.size();
+
+      std::cout << "Update Time (ms): " << particle_update_diff << std::endl;
+
+      for(std::size_t i = 0; i < particles_.size(); i++){
+        // Normalize log weights by max, transform back to linear scale
+        particles_[i].weight = exp(particles_[i].weight - max_weight_log_);
+        
+        // Sum all linear weights
+        weight_sum_ += particles_[i].weight;
+        weight_sum_squared += particles_[i].weight*particles_[i].weight;
+        // Generate Resampling bins
+        weight_bins_[i] = weight_sum_;
+      }
+
+      std::cout << "Effective Sampling Coefficient: " << 1/weight_sum_squared << std::endl << std::endl;
+
+      // Resample
+      if(!(resample_loop_counter_ % CONFIG_resample_frequency)){
+        std::cout << "Resample" << std::endl;
+        LowVarianceResample();
+      }
+
+      // Update previous state variables
+      last_update_loc_ = prev_odom_loc_;
+      last_update_angle_ = prev_odom_angle_;
+      resample_loop_counter_++;
+
+      end_time += 1000*(GetMonotonicTime() - start_time);
       
-      // Transform noise to map using current particle angle
-      auto rot_bl1_to_map = Eigen::Rotation2D<float>(particle.angle).toRotationMatrix();
-      particle.loc += rot_bl1_to_map * noisy_translation;   
-      particle.angle += noisy_angle;        
+      // Profiling
+      if(i%10 == 0){
+        std::cout << "Total Update Avg (ms): " << end_time/10.0 << std::endl << std::endl;
+        end_time = 0;
+      }
+      i++;
     }
-
-    last_update_loc_ = prev_odom_loc_;
-    last_update_angle_ = prev_odom_angle_;
-    lidar_odom_ = PoseWithCovariance();
-    wheel_odom_ = PoseWithCovariance();
-    estimated_odom_ = PoseWithCovariance();
-
-    // Initialize Particle Filter Update variables
-    max_weight_log_ = -1e10;
-    weight_sum_ = 0;
-    weight_bins_.resize(particles_.size());
-    std::fill(weight_bins_.begin(), weight_bins_.end(), 0);
-
-    // Update each particle with log error weight and find largest weight (smallest negative number)
-    //double particle_update_start = GetMonotonicTime();
-    //double p_update_start = 0;
-    //double p_update_diff_avg = 0;
-    for(Particle &p: particles_){
-      //p_update_start = GetMonotonicTime();
-
-      Update(ranges, range_min, range_max, angle_min, angle_max, &p);
-      max_weight_log_ = std::max(max_weight_log_, p.weight);
-      
-      //p_update_diff_avg += 1000000*(GetMonotonicTime() - p_update_start);
-    }
-    // Update loop profiling
-    //double particle_update_diff = 1000*(GetMonotonicTime() - particle_update_start);
-    //p_update_diff_avg /= particles_.size();
-
-    for(std::size_t i = 0; i < particles_.size(); i++){
-      // Normalize log weights by max, transform back to linear scale
-      particles_[i].weight = exp(particles_[i].weight - max_weight_log_);
-      
-      // Sum all linear weights
-      weight_sum_ += particles_[i].weight;
-
-      // Generate Resampling bins
-      weight_bins_[i] = weight_sum_;
-    }
-
-    // Resample
-    if(!(resample_loop_counter_ % CONFIG_resample_frequency)){
-      LowVarianceResample();
-    }
-
-    // Update previous state variables
-    last_update_loc_ = prev_odom_loc_;
-    last_update_angle_ = prev_odom_angle_;
-    resample_loop_counter_++;
-
-    //end_time += 1000*(GetMonotonicTime() - start_time);
-    
-    // // Profiling
-    // if(i%10 == 0){
-    //   std::cout << "Total Update Avg (ms): " << end_time/10.0 << std::endl << std::endl;;
-    //   end_time = 0;
-    // }
-    // i++;
   }                     
 }
 
