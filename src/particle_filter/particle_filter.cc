@@ -79,6 +79,7 @@ CONFIG_FLOAT(dist_search_range, "dist_search_range");
 
 CONFIG_DOUBLE(csm_sigma_observation, "csm_sigma_observation");
 CONFIG_DOUBLE(csm_gamma, "csm_gamma");
+CONFIG_DOUBLE(csm_rot_noise, "csm_rot_noise");
 
 CONFIG_DOUBLE(map_length_dist, "map_length_dist");
 CONFIG_DOUBLE(min_map_prob, "min_map_prob");
@@ -365,9 +366,9 @@ void ParticleFilter::PredictEKF(const Eigen::Vector2f& odom_loc, const float odo
  * Odometry and Lidar distrbutions are fused during has_new_lidar block
  */
 void ParticleFilter::UpdateEKF(){
-  odom_proposal_img = transform_cube_slice::TransformCubeSlice(0.5, 0.01, 00);
-  lidar_proposal_img = transform_cube_slice::TransformCubeSlice(0.5, 0.01, 00);
-  ekf_proposal_img = transform_cube_slice::TransformCubeSlice(0.5, 0.01, 00);
+  odom_proposal_img = transform_cube_slice::TransformCubeSlice(1.0, 0.01, 00);
+  lidar_proposal_img = transform_cube_slice::TransformCubeSlice(1.0, 0.01, 00);
+  ekf_proposal_img = transform_cube_slice::TransformCubeSlice(1.0, 0.01, 00);
 
   //Kalman Gain K - wheel_odom_.covariance = Q, lidar_odom_.covariance = R
   //K = Q * (Q+R)^-1
@@ -399,8 +400,8 @@ void ParticleFilter::UpdateEKF(){
   for(int x = 0; x < ekf_proposal_img.GetColNum(); x++){
     for(int y = 0; y < ekf_proposal_img.GetColNum(); y++){
       int image_y = ekf_proposal_img.GetColNum() - y - 1;
-      double x_distance = x*0.01-0.25;
-      double y_distance = y*0.01-0.25;
+      double x_distance = x*0.01-0.5;
+      double y_distance = y*0.01-0.5;
 
       double wheel_odom_prob = exp(-0.5*(wheel_odom_.pose.translation.x() - x_distance)*(wheel_odom_.pose.translation.x() - x_distance)/wheel_odom_.covariance(0, 0))
                               *exp(-0.5*(wheel_odom_.pose.translation.y() - y_distance)*(wheel_odom_.pose.translation.y() - y_distance)/wheel_odom_.covariance(1, 1));
@@ -774,9 +775,9 @@ void ParticleFilter::EstimateLidarOdometry(){
     likelihood_cube_.DrawCSMImage();
 
     Eigen::Matrix3f independent_covariance;
-    independent_covariance << covariance(0, 0),                          0,                            0,
-                              0,                          covariance(1, 1),                            0,
-                              0,                                         0,             covariance(2, 2) + 0.03;
+    independent_covariance << covariance(0, 0) + 0.01,                          0,                            0,
+                              0,                          covariance(1, 1) + 0.01,                            0,
+                              0,                                         0,             covariance(2, 2) + CONFIG_csm_rot_noise;
 
     lidar_odom_ = PoseWithCovariance(T, independent_covariance);
 }
@@ -831,6 +832,11 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
     if(std::strcmp(CONFIG_localization_mode.c_str(), "lidar") == 0){
       estimated_odom_.pose.ApplyPose(lidar_odom_.pose);
       estimated_odom_.covariance += lidar_odom_.covariance;
+
+      last_update_loc_ = prev_odom_loc_;
+      last_update_angle_ = prev_odom_angle_;
+      lidar_odom_ = PoseWithCovariance();
+      wheel_odom_ = PoseWithCovariance();
     }
 
     vector<Vector2f> tf_scan(ranges.size());
@@ -843,7 +849,6 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
     //low_csm_map_.DrawScanCloudOnImage(tf_scan, CONFIG_csm_eval_range_max);
     csm_map_.DrawScanCloudOnImage(tf_scan, std::min(CONFIG_csm_eval_range_max, csm_map_.GetMaxRangeInScan()), false);
     csm_map_.DrawScanCloudOnImage(odom_scan, std::min(CONFIG_csm_eval_range_max, csm_map_.GetMaxRangeInScan()), true);
-    
 
     // Update cost map with new cloud_
     csm_map_.GenerateMapFromNewScan(scan_cloud_);
@@ -852,6 +857,11 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
     if(std::strcmp(CONFIG_localization_mode.c_str(), "ekf") == 0){
       // EKF Update
       UpdateEKF();
+
+      last_update_loc_ = prev_odom_loc_;
+      last_update_angle_ = prev_odom_angle_;
+      lidar_odom_ = PoseWithCovariance();
+      wheel_odom_ = PoseWithCovariance();
     }
 
     if(std::strcmp(CONFIG_localization_mode.c_str(), "ekf_pf") == 0){
@@ -917,7 +927,6 @@ void ParticleFilter::ObserveLaser(const vector<float>& ranges,
 
       // Resample
       if(!(resample_loop_counter_ % CONFIG_resample_frequency)){
-        std::cout << "Resample" << std::endl;
         LowVarianceResample();
       }
 
